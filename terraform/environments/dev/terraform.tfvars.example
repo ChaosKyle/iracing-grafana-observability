@@ -1,0 +1,15 @@
+grafana_url           = "http://localhost:3000"
+grafana_auth          = "admin:admin"
+grafana_admin_user    = "admin"
+grafana_admin_pass    = "securepassword"
+
+docker_host           = "unix:///var/run/docker.sock"
+
+influxdb_admin_user     = "admin"
+influxdb_admin_password = "influxdb_password"
+influxdb_org            = "iracing"
+influxdb_bucket         = "iracing_telemetry"
+
+postgres_user         = "postgres"
+postgres_password     = "postgres_password"
+postgres_database     = "iracing_data"
