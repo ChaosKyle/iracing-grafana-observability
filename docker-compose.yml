@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+  # PostgreSQL for historical race data
+  postgres:
+    image: postgres:14
+    container_name: iracing-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_password}
+      POSTGRES_DB: ${POSTGRES_DB:-iracing_data}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./terraform/modules/postgres/schema.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - iracing-network
+
+  # InfluxDB for time-series telemetry data
+  influxdb:
+    image: influxdb:2.6
+    container_name: iracing-influxdb
+    restart: unless-stopped
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: ${INFLUXDB_ADMIN_USER:-admin}
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUXDB_ADMIN_PASSWORD:-influxdb_password}
+      DOCKER_INFLUXDB_INIT_ORG: ${INFLUXDB_ORG:-iracing}
+      DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUXDB_BUCKET:-iracing_telemetry}
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_TOKEN:-}
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+    ports:
+      - "8086:8086"
+    networks:
+      - iracing-network
+
+  # Grafana for visualization
+  grafana:
+    build:
+      context: .
+      dockerfile: docker/dashboard/Dockerfile
+    container_name: iracing-grafana
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - influxdb
+    environment:
+      INFLUXDB_HOST: influxdb
+      INFLUXDB_TOKEN: ${INFLUXDB_TOKEN:-}
+      POSTGRES_HOST: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_password}
+    ports:
+      - "3000:3000"
+    networks:
+      - iracing-network
+
+  # iRacing data collector
+  collector:
+    build:
+      context: .
+      dockerfile: docker/collector/Dockerfile
+    container_name: iracing-collector
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - influxdb
+    environment:
+      IRACING_USERNAME: ${IRACING_USERNAME}
+      IRACING_PASSWORD: ${IRACING_PASSWORD}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_password}
+      POSTGRES_DB: ${POSTGRES_DB:-iracing_data}
+      INFLUXDB_URL: http://influxdb:8086
+      INFLUXDB_TOKEN: ${INFLUXDB_TOKEN:-}
+      INFLUXDB_ORG: ${INFLUXDB_ORG:-iracing}
+      INFLUXDB_BUCKET: ${INFLUXDB_BUCKET:-iracing_telemetry}
+      COLLECTOR_CRON_SCHEDULE: ${COLLECTOR_CRON_SCHEDULE:-"0 */6 * * *"}
+    networks:
+      - iracing-network
+
+networks:
+  iracing-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  influxdb-data:
