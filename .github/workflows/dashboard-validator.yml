@@ -9,6 +9,11 @@ on:
     branches: [ main, master ]
     paths:
       - 'terraform/modules/grafana/dashboards/**'
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: '3.10'
+  DASHBOARDS_PATH: 'terraform/modules/grafana/dashboards'
 
 jobs:
   validate:
@@ -20,7 +25,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.10'
+        python-version: ${{ env.PYTHON_VERSION }}
     
     - name: Install dependencies
       run: |
@@ -29,8 +34,8 @@ jobs:
     
     - name: Validate JSON dashboards
       run: |
-        python python/utils/dashboard_validator.py terraform/modules/grafana/dashboards/
+        python python/utils/dashboard_validator.py ${{ env.DASHBOARDS_PATH }}
     
     - name: Check dashboard IDs for uniqueness
       run: |
-        python python/utils/check_dashboard_ids.py terraform/modules/grafana/dashboards/
+        python python/utils/check_dashboard_ids.py ${{ env.DASHBOARDS_PATH }}

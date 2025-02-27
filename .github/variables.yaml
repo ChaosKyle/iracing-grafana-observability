@@ -1,0 +1,24 @@
+# GitHub Variables
+# These variables are used across multiple workflows
+# Access them from workflow files using variables context:
+# ${{ vars.VARIABLE_NAME }}
+
+# Python settings
+PYTHON_VERSION: '3.10'
+PYTHON_PATH: 'python'
+MAX_LINE_LENGTH: '127'
+MAX_COMPLEXITY: '10'
+
+# Docker settings
+REGISTRY: 'ghcr.io'
+COLLECTOR_IMAGE_NAME: 'iracing-collector'
+DASHBOARD_IMAGE_NAME: 'iracing-dashboard'
+DOCKER_PATH: 'docker'
+
+# Path settings
+DASHBOARDS_PATH: 'terraform/modules/grafana/dashboards'
+COLLECTOR_SCRIPT: 'python/collectors/iracing_collector.py'
+LOGS_FILE: 'iracing_collector.log'
+
+# Timing Settings
+DATA_COLLECTION_CRON: '0 */6 * * *'  # Every 6 hours

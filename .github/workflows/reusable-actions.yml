@@ -1,0 +1,52 @@
+name: Reusable GitHub Actions
+
+# This workflow contains reusable actions for other workflows
+# See: https://docs.github.com/en/actions/using-workflows/reusing-workflows
+
+on:
+  workflow_call:
+    inputs:
+      python-version:
+        description: 'Python version to use'
+        required: false
+        default: '3.10'
+        type: string
+      requirements-file:
+        description: 'Requirements file to install'
+        required: false
+        default: 'python/requirements.txt'
+        type: string
+      additional-packages:
+        description: 'Additional packages to install'
+        required: false
+        default: ''
+        type: string
+
+jobs:
+  setup-python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ inputs.python-version }}
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -n "${{ inputs.requirements-file }}" ]; then
+            pip install -r ${{ inputs.requirements-file }}
+          fi
+          if [ -n "${{ inputs.additional-packages }}" ]; then
+            pip install ${{ inputs.additional-packages }}
+          fi
+        
+      - name: Cache Python dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles(inputs.requirements-file) }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
