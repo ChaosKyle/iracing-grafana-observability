@@ -2,7 +2,7 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability within this project, please send an email to [security@example.com](mailto:security@example.com). Do not disclose security vulnerabilities publicly until they have been handled by the project maintainers.
+If you discover a security vulnerability within this project, please send an setup an issue. Do not disclose security vulnerabilities publicly until they have been handled by the project maintainers.
 
 Please include the following information in your report:
 
