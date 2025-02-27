@@ -1,0 +1,27 @@
+# CODEOWNERS file for iracing-grafana-observability
+# Each line is a file pattern followed by one or more owners.
+
+# Default owners for everything in the repo
+* @ChaosKyle
+
+# Security critical files
+/SECURITY.md @ChaosKyle
+/.github/workflows/ @ChaosKyle
+/.github/dependabot.yml @ChaosKyle
+/docker/ @ChaosKyle
+/python/utils/db_connector.py @ChaosKyle
+/python/utils/influx_connector.py @ChaosKyle
+
+# Documentation
+/docs/ @ChaosKyle
+*.md @ChaosKyle
+
+# Infrastructure
+/docker-compose.yml @ChaosKyle
+/terraform/ @ChaosKyle
+
+# Python code
+/python/ @ChaosKyle
+
+# GitHub templates and workflows
+/.github/ @ChaosKyle
