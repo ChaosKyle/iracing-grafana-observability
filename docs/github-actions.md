@@ -1,15 +1,15 @@
 # GitHub Actions Workflows
 
-This document describes the GitHub Actions workflows used in the iRacing Grafana Observability project.
+This document describes the GitHub Actions workflows used in the iRacing Grafana Observability project for development purposes.
 
 ## Overview
 
-GitHub Actions automate our continuous integration and delivery processes, ensuring code quality and facilitating deployment. Our workflows handle:
+GitHub Actions automate our testing and validation processes, ensuring code quality during development. Our workflows handle:
 
 - Python code testing and linting
-- Docker image building and publishing
+- Docker image building verification
 - Dashboard validation
-- Automated data collection
+- Automated testing
 
 ## Workflow Configuration
 
@@ -36,21 +36,18 @@ MAX_LINE_LENGTH: 127
 MAX_COMPLEXITY: 10
 ```
 
-### 2. Docker Build & Push (`docker-build.yml`)
+### 2. Docker Build (`docker-build.yml`)
 
-This workflow builds and publishes Docker images to GitHub Container Registry:
+This workflow validates Docker configurations:
 
 - **Triggers**: Push or pull request to main/master that changes Docker files
 - **Actions**:
   - Sets up Docker Buildx
-  - Logs in to GitHub Container Registry
-  - Builds and tags collector image
-  - Builds and tags dashboard image
-  - Pushes images to GHCR when on main/master branch
+  - Builds collector image for testing
+  - Builds dashboard image for testing
 
 Example variable configuration:
 ```yaml
-REGISTRY: 'ghcr.io'
 COLLECTOR_IMAGE_NAME: 'iracing-collector'
 DASHBOARD_IMAGE_NAME: 'iracing-dashboard'
 DOCKER_PATH: 'docker'
@@ -71,24 +68,7 @@ Example variable configuration:
 DASHBOARDS_PATH: 'terraform/modules/grafana/dashboards'
 ```
 
-### 4. Data Collection (`data-collection.yml`)
-
-This workflow automatically collects data from iRacing:
-
-- **Triggers**: Schedule (every 6 hours) or manual trigger
-- **Actions**:
-  - Sets up Python environment
-  - Runs data collection script
-  - Uploads logs as artifacts
-
-Example variable configuration:
-```yaml
-COLLECTOR_SCRIPT: 'python/collectors/iracing_collector.py'
-LOGS_FILE: 'iracing_collector.log'
-DATA_COLLECTION_CRON: '0 */6 * * *'
-```
-
-### 5. Reusable Actions (`reusable-actions.yml`)
+### 4. Reusable Actions (`reusable-actions.yml`)
 
 This workflow contains reusable job definitions for other workflows:
 
@@ -98,32 +78,45 @@ This workflow contains reusable job definitions for other workflows:
   - Dependency installation
   - Caching for faster builds
 
-## Required Secrets
+## Setting Up Local Testing
 
-The following secrets must be configured in your GitHub repository settings:
+Instead of relying solely on GitHub Actions, you can run the same validation checks locally:
 
-1. **For Docker image publishing**:
-   - `GITHUB_TOKEN` (automatically provided)
+### Running Python Tests
 
-2. **For data collection**:
-   - `IRACING_USERNAME`
-   - `IRACING_PASSWORD`
-   - `POSTGRES_HOST`
-   - `POSTGRES_PORT`
-   - `POSTGRES_USER`
-   - `POSTGRES_PASSWORD`
-   - `POSTGRES_DB`
-   - `INFLUXDB_URL`
-   - `INFLUXDB_TOKEN`
-   - `INFLUXDB_ORG`
-   - `INFLUXDB_BUCKET`
+```bash
+# Install test dependencies
+pip install pytest flake8
 
-## Setting Up Repository Secrets
+# Run linting
+flake8 python/ --count --select=E9,F63,F7,F82 --show-source --statistics
 
-1. Navigate to your GitHub repository
-2. Go to Settings > Secrets and variables > Actions
-3. Click "New repository secret"
-4. Add each required secret with its appropriate value
+# Run tests
+pytest python/tests/
+```
+
+### Validating Dashboards
+
+```bash
+# Install validation dependencies
+pip install jsonschema pyyaml
+
+# Validate dashboard JSON files
+python python/utils/dashboard_validator.py terraform/modules/grafana/dashboards/
+
+# Check for unique dashboard IDs
+python python/utils/check_dashboard_ids.py terraform/modules/grafana/dashboards/
+```
+
+### Testing Docker Builds
+
+```bash
+# Build collector image
+docker build -t iracing-collector -f docker/collector/Dockerfile .
+
+# Build dashboard image
+docker build -t iracing-dashboard -f docker/dashboard/Dockerfile .
+```
 
 ## Workflow Customization
 
@@ -157,14 +150,14 @@ You can manually trigger workflows that support the `workflow_dispatch` event:
    - Check for duplicate dashboard IDs
    - Verify required fields are present
 
-4. **Data collection failures**:
-   - Check secret values are correctly configured
-   - Verify network access to external services
+4. **Test failures**:
+   - Run tests locally to debug: `pytest python/tests/`
+   - Check requirements are installed: `pip install -r python/requirements.txt`
 
-## Workflow Logs and Artifacts
+## Workflow Logs
 
-Workflow run logs and artifacts are available in the GitHub Actions UI:
+Workflow run logs are available in the GitHub Actions UI:
 
 1. Go to the Actions tab in your repository
 2. Select the workflow run you want to inspect
-3. Download artifacts or view logs for specific steps
+3. View logs for specific steps

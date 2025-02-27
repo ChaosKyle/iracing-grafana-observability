@@ -1,6 +1,6 @@
 # iRacing Grafana Observability
 
-A comprehensive solution for collecting, storing, and visualizing iRacing telemetry and performance data using Grafana, managed with Terraform and automated with GitHub Actions.
+A comprehensive solution for collecting, storing, and visualizing iRacing telemetry and performance data using Grafana with local Docker deployment.
 
 ![iRacing Telemetry Dashboard](docs/images/dashboard-preview.png)
 
@@ -11,7 +11,6 @@ This project provides a full-stack solution to collect, store, and visualize iRa
 - **Data Collection**: Python scripts to extract data from the iRacing API and telemetry files
 - **Storage**: PostgreSQL for historical race data and InfluxDB for time-series telemetry data
 - **Visualization**: Grafana dashboards for performance analysis and insights
-- **Infrastructure**: Terraform configurations for cloud deployment
 - **Containerization**: Docker images for all components
 - **Automation**: GitHub Actions workflows for CI/CD
 
@@ -32,12 +31,10 @@ This project provides a full-stack solution to collect, store, and visualize iRa
 │   ├── collectors/             # Data collection scripts
 │   ├── tests/                  # Unit and integration tests
 │   └── utils/                  # Utility functions and connectors
-├── terraform/                  # Infrastructure as Code
-│   ├── environments/           # Environment configurations
-│   └── modules/                # Reusable Terraform modules
-│       ├── grafana/            # Grafana module with dashboards
-│       ├── influxdb/           # InfluxDB time-series database
-│       └── postgres/           # PostgreSQL relational database
+├── terraform/                  # Dashboard definitions and templates
+│   └── modules/                
+│       └── grafana/            # Grafana dashboards
+│           └── dashboards/     # Dashboard JSON files
 ├── README.md                   # Project documentation
 ├── docker-compose.yml          # Local development stack
 └── setup.sh                    # Setup script for local development
@@ -47,7 +44,6 @@ This project provides a full-stack solution to collect, store, and visualize iRa
 
 - iRacing membership and API access
 - Docker and Docker Compose
-- Terraform v1.0+ (for cloud deployment)
 - Python 3.10+
 - Git
 
@@ -124,49 +120,21 @@ This project provides a full-stack solution to collect, store, and visualize iRa
    python python/collectors/iracing_collector.py
    ```
 
-## Cloud Deployment with Terraform
-
-1. **Configure cloud provider credentials**:
-   Set up your cloud provider credentials according to Terraform's documentation for your chosen provider (AWS, Azure, GCP).
-
-2. **Set up Terraform variables**:
-   ```bash
-   cd terraform/environments/dev
-   cp terraform.tfvars.example terraform.tfvars
-   # Edit terraform.tfvars with your configuration
-   ```
-
-3. **Initialize and deploy**:
-   ```bash
-   terraform init
-   terraform plan  # Review the changes
-   terraform apply  # Deploy the infrastructure
-   ```
-
-4. **Get output information**:
-   ```bash
-   terraform output  # Shows URLs and connection details
-   ```
-
 ## GitHub Actions Workflows
 
-The project includes automated CI/CD pipelines using GitHub Actions:
+The project includes automated CI/CD pipelines for development:
 
 1. **Python CI**: Runs tests and linting for Python code changes
-   - Triggers on changes to Python files
+   - Validates code quality
    - Runs flake8 and pytest
 
-2. **Docker Build & Push**: Builds and publishes Docker images to GitHub Container Registry
-   - Triggers on changes to Dockerfile or related files
-   - Builds collector and dashboard images
+2. **Docker Build**: Builds Docker images
+   - Validates Docker configurations
+   - Tests container builds
 
 3. **Dashboard Validator**: Validates the Grafana dashboard JSON files
    - Checks for proper structure and unique IDs
    - Ensures all dashboards match our standards
-
-4. **Data Collection**: Scheduled workflow to collect data from iRacing
-   - Runs every 6 hours
-   - Can be triggered manually via workflow_dispatch
 
 ### Workflow Customization
 
@@ -187,6 +155,41 @@ The project includes the following Grafana dashboards:
 2. **Lap Times**: Detailed lap time analysis with comparisons
 3. **Performance Trends**: Long-term iRating and Safety Rating progression
 4. **Race Strategy**: Fuel usage, pit stop timing, and race planning tools
+
+## Usage Guide
+
+### Collecting iRacing Data
+
+1. **Manual Collection**:
+   ```bash
+   # Activate your virtual environment if using local setup
+   source venv/bin/activate
+   
+   # Run the collector script
+   python python/collectors/iracing_collector.py
+   ```
+
+2. **Using Docker**:
+   ```bash
+   # Trigger the collector container
+   docker-compose restart collector
+   
+   # View logs
+   docker-compose logs -f collector
+   ```
+
+### Viewing Dashboards
+
+1. Open http://localhost:3000 in your browser
+2. Navigate to Dashboards > Browse
+3. Select one of the available iRacing dashboards
+
+### Customizing Dashboards
+
+1. Open a dashboard in Grafana
+2. Click the gear icon to edit
+3. Customize panels as needed
+4. Save your changes
 
 ## Contributing
 
@@ -222,6 +225,11 @@ The project includes the following Grafana dashboards:
    - Verify data source configuration in Grafana
    - Check that data collection has run successfully
    - Examine Grafana logs: `docker-compose logs dashboard`
+
+4. **Docker Compose Issues**:
+   - Verify Docker and Docker Compose are installed correctly
+   - Check that ports are not already in use (3000, 5432, 8086)
+   - Restart the stack: `docker-compose down && docker-compose up -d`
 
 ## License
 
