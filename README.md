@@ -44,8 +44,14 @@ This project provides a full-stack solution to collect, store, and visualize iRa
 
 - iRacing membership and API access
 - Docker and Docker Compose
+  - Mac: [Docker Desktop for Mac](https://docs.docker.com/desktop/install/mac-install/)
+  - Windows: [Docker Desktop for Windows](https://docs.docker.com/desktop/install/windows-install/)
 - Python 3.10+
+  - Mac: Available via Homebrew or [python.org](https://www.python.org/downloads/macos/)
+  - Windows: Available from [python.org](https://www.python.org/downloads/windows/)
 - Git
+  - Mac: Included with Xcode Command Line Tools or via Homebrew
+  - Windows: [Git for Windows](https://gitforwindows.org/)
 
 ## Setup and Installation
 
@@ -92,13 +98,15 @@ This project provides a full-stack solution to collect, store, and visualize iRa
 
 ### Local Development Setup
 
+#### macOS/Linux
+
 1. **Set up the Python environment**:
    ```bash
    # Create virtual environment
    python -m venv venv
    
    # Activate the virtual environment
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   source venv/bin/activate
    
    # Install dependencies
    pip install -r python/requirements.txt
@@ -108,16 +116,56 @@ This project provides a full-stack solution to collect, store, and visualize iRa
    ```bash
    cp .env.example .env
    # Edit .env with your credentials
+   # Make sure to set POSTGRES_HOST=localhost and INFLUXDB_URL=http://localhost:8086
    ```
 
 3. **Run the setup script**:
    ```bash
+   # Make the script executable
+   chmod +x setup.sh
+   
+   # Run the script
    ./setup.sh
    ```
 
 4. **Run the data collector**:
    ```bash
    python python/collectors/iracing_collector.py
+   ```
+
+#### Windows
+
+1. **Set up the Python environment**:
+   ```cmd
+   # Create virtual environment
+   python -m venv venv
+   
+   # Activate the virtual environment
+   venv\Scripts\activate
+   
+   # Install dependencies
+   pip install -r python/requirements.txt
+   ```
+
+2. **Configure environment variables**:
+   ```cmd
+   copy .env.example .env
+   # Edit .env with your credentials using Notepad or other text editor
+   # Make sure to set POSTGRES_HOST=localhost and INFLUXDB_URL=http://localhost:8086
+   ```
+
+3. **Run the setup script**:
+   ```cmd
+   # If using PowerShell:
+   .\setup.ps1
+   
+   # If using Git Bash:
+   ./setup.sh
+   ```
+
+4. **Run the data collector**:
+   ```cmd
+   python python\collectors\iracing_collector.py
    ```
 
 ## GitHub Actions Workflows
@@ -160,6 +208,8 @@ The project includes the following Grafana dashboards:
 
 ### Collecting iRacing Data
 
+#### macOS/Linux
+
 1. **Manual Collection**:
    ```bash
    # Activate your virtual environment if using local setup
@@ -171,6 +221,26 @@ The project includes the following Grafana dashboards:
 
 2. **Using Docker**:
    ```bash
+   # Trigger the collector container
+   docker-compose restart collector
+   
+   # View logs
+   docker-compose logs -f collector
+   ```
+
+#### Windows
+
+1. **Manual Collection**:
+   ```cmd
+   # Activate your virtual environment if using local setup
+   venv\Scripts\activate
+   
+   # Run the collector script
+   python python\collectors\iracing_collector.py
+   ```
+
+2. **Using Docker**:
+   ```cmd
    # Trigger the collector container
    docker-compose restart collector
    
@@ -230,6 +300,38 @@ The project includes the following Grafana dashboards:
    - Verify Docker and Docker Compose are installed correctly
    - Check that ports are not already in use (3000, 5432, 8086)
    - Restart the stack: `docker-compose down && docker-compose up -d`
+
+### Platform-Specific Troubleshooting
+
+#### macOS Issues
+
+1. **Performance Issues**:
+   - Docker Desktop on Mac may use excessive CPU/memory. In Docker Desktop settings:
+     - Limit resources in the "Resources" section
+     - Enable "Use the new Virtualization framework" if available
+
+2. **iRacing Telemetry Access**:
+   - Ensure your Mac has access to the iRacing folders
+   - For sim racing data, you may need to run Docker with shared folders
+
+#### Windows Issues
+
+1. **WSL 2 Backend**:
+   - Ensure Docker Desktop is using the WSL 2 backend for better performance
+   - Update WSL 2 to the latest version if you encounter issues
+
+2. **Path Issues in Windows**:
+   - Windows uses backslashes `\` while scripts may expect forward slashes `/`
+   - Use Git Bash instead of CMD to avoid path issues
+   - If using PowerShell, some commands may need adjustment
+
+3. **Firewall Issues**:
+   - Allow Docker through Windows Firewall
+   - If running iRacing on the same machine, ensure the collector can access it
+
+4. **Docker Volume Permissions**:
+   - Windows may have permission issues with Docker volumes
+   - Try running Docker Desktop as Administrator if files aren't accessible
 
 ## License
 
