@@ -160,7 +160,13 @@ echo "Setup complete! Next steps:"
 echo
 echo "1. Edit .env file with your iRacing credentials and database passwords"
 echo "2. Start the stack with: docker-compose up -d"
-echo "3. Access Grafana at: http://localhost:\${GRAFANA_PORT:-3000} (default login: admin/admin)"
+# Get the configured Grafana port from .env if available
+if grep -q "^GRAFANA_PORT=" .env; then
+    GRAFANA_PORT=$(grep "^GRAFANA_PORT=" .env | cut -d= -f2)
+else
+    GRAFANA_PORT=3000
+fi
+echo "3. Access Grafana at: http://localhost:$GRAFANA_PORT (default login: admin/admin)"
 echo "4. To run the collector manually: python python/collectors/iracing_collector.py"
 echo
 echo "For more information, see the documentation in docs/ directory."
