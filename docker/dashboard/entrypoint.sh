@@ -13,7 +13,7 @@ if [ ! -z "$INFLUXDB_HOST" ]; then
     
     retry_count=0
     while [ $retry_count -lt $MAX_RETRIES ]; do
-        if curl -s -f "$INFLUXDB_HOST:8086/health" > /dev/null 2>&1; then
+        if curl -s -f "$INFLUXDB_HOST:8086/health" > /dev/null 2>&1 || curl -s -f "$INFLUXDB_HOST:8086/ping" > /dev/null 2>&1; then
             echo "InfluxDB is ready!"
             break
         fi

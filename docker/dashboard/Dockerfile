@@ -1,4 +1,4 @@
-FROM grafana/grafana:9.3.2
+FROM grafana/grafana:latest
 
 # Set Grafana env variables
 ENV GF_INSTALL_PLUGINS="grafana-clock-panel,grafana-worldmap-panel,grafana-piechart-panel"
