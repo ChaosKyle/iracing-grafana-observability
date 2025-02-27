@@ -5,7 +5,14 @@ import json
 import time
 import logging
 from datetime import datetime, timedelta
-import pandas as pd
+
+# Handle import dependencies gracefully
+try:
+    import pandas as pd
+except ImportError:
+    print("Error: pandas package is required. Install with: pip install pandas")
+    sys.exit(1)
+    
 from dotenv import load_dotenv
 
 # Add the parent directory to the path for imports
@@ -211,7 +218,13 @@ class iRacingCollector:
             
             # Parse telemetry file using irsdk or similar
             try:
-                import irsdk
+                try:
+                    import irsdk
+                except ImportError:
+                    logger.error("irsdk package not installed. Telemetry processing will be skipped.")
+                    logger.info("Try installing irsdk with: pip install git+https://github.com/kutu/pyirsdk")
+                    return False
+                
                 ir_sdk = irsdk.IRSDK()
                 ir_sdk.startup(telemetry_path)
                 
@@ -261,7 +274,7 @@ class iRacingCollector:
                 return len(telemetry_data)
             
             finally:
-                if 'ir_sdk' in locals() and ir_sdk.is_connected:
+                if 'ir_sdk' in locals() and hasattr(ir_sdk, 'is_connected') and ir_sdk.is_connected:
                     ir_sdk.shutdown()
         
         except Exception as e:
@@ -294,9 +307,18 @@ class iRacingCollector:
 
 
 if __name__ == "__main__":
-    collector = iRacingCollector()
-    if collector.run_collection():
-        logger.info("Data collection completed successfully")
-    else:
-        logger.error("Data collection failed")
+    try:
+        collector = iRacingCollector()
+        if collector.run_collection():
+            logger.info("Data collection completed successfully")
+        else:
+            logger.error("Data collection failed")
+            sys.exit(1)
+    except ImportError as e:
+        print(f"Error: Missing required dependencies. {e}")
+        print("Make sure you have installed all required packages with:")
+        print("pip install -r requirements.txt")
+        sys.exit(1)
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
         sys.exit(1)
