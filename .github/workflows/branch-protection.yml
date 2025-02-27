@@ -1,0 +1,49 @@
+name: Branch Protection Check
+
+on:
+  pull_request:
+    branches: [ main ]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+jobs:
+  check-branch-protection:
+    name: Check Branch Protection Rules
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Verify commits signed
+        if: github.event.pull_request.draft == false
+        run: |
+          UNSIGNED_COMMITS=$(git log --no-merges --pretty=format:"%H %GS" ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} | grep -v "G" || true)
+          if [ -n "$UNSIGNED_COMMITS" ]; then
+            echo "Error: Unsigned commits found:"
+            echo "$UNSIGNED_COMMITS"
+            echo ""
+            echo "All commits must be signed to merge into the main branch."
+            echo "See https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification"
+            exit 1
+          else
+            echo "All commits are properly signed"
+          fi
+
+      - name: Verify no direct changes to security-sensitive files
+        if: github.event.pull_request.draft == false
+        run: |
+          SENSITIVE_PATTERNS=(
+            "SECURITY.md"
+            ".github/workflows/"
+            ".github/dependabot.yml"
+            ".github/CODEOWNERS"
+          )
+          
+          for pattern in "${SENSITIVE_PATTERNS[@]}"; do
+            CHANGES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} | grep -E "$pattern" || true)
+            if [ -n "$CHANGES" ]; then
+              echo "Warning: Changes detected to security-sensitive files:"
+              echo "$CHANGES"
+              echo ""
+              echo "These files require extra review attention."
+            fi
+          done
