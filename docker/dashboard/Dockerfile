@@ -12,11 +12,13 @@ COPY docker/dashboard/provisioning/dashboards /etc/grafana/provisioning/dashboar
 COPY docker/dashboard/provisioning/datasources /etc/grafana/provisioning/datasources
 
 # Copy dashboards
-COPY dashboards /var/lib/grafana/dashboards
+RUN mkdir -p /var/lib/grafana/dashboards
 COPY terraform/modules/grafana/dashboards/*.json /var/lib/grafana/dashboards/
 
 # Add custom entrypoint script
-COPY docker/dashboard/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+COPY docker/dashboard/entrypoint.sh /usr/local/bin/custom-entrypoint.sh
+USER root
+RUN chmod +x /usr/local/bin/custom-entrypoint.sh
+USER grafana
 
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["/usr/local/bin/custom-entrypoint.sh"]

@@ -27,9 +27,6 @@ ENV PYTHONUNBUFFERED=1 \
 RUN useradd -m appuser
 USER appuser
 
-# Set up default configuration file
-COPY docker/collector/config.env ./config.env.template
-
 # Entry point script
 COPY docker/collector/entrypoint.sh ./entrypoint.sh
 RUN chmod +x ./entrypoint.sh
