@@ -60,14 +60,14 @@ jobs:
         severity: 'CRITICAL,HIGH'
 
     - name: Upload Trivy collector scan results to GitHub Security tab
-      uses: github/codeql-action/upload-sarif@v2
+      uses: github/codeql-action/upload-sarif@v3
       if: always()
       with:
         sarif_file: 'trivy-collector-results.sarif'
         category: 'collector-container'
 
     - name: Upload Trivy dashboard scan results to GitHub Security tab
-      uses: github/codeql-action/upload-sarif@v2
+      uses: github/codeql-action/upload-sarif@v3
       if: always()
       with:
         sarif_file: 'trivy-dashboard-results.sarif'
