@@ -4,20 +4,51 @@
 # Wait for InfluxDB and PostgreSQL to be ready
 echo "Waiting for databases to be ready..."
 
+MAX_RETRIES=30
+RETRY_INTERVAL=5
+
+# Check if InfluxDB is available
 if [ ! -z "$INFLUXDB_HOST" ]; then
-    until curl -s "$INFLUXDB_HOST:8086/health" | grep -q "ready"; do
-        echo "Waiting for InfluxDB to be ready..."
-        sleep 5
+    echo "Checking InfluxDB at $INFLUXDB_HOST:8086..."
+    
+    retry_count=0
+    while [ $retry_count -lt $MAX_RETRIES ]; do
+        if curl -s -f "$INFLUXDB_HOST:8086/health" > /dev/null 2>&1; then
+            echo "InfluxDB is ready!"
+            break
+        fi
+        
+        retry_count=$((retry_count+1))
+        if [ $retry_count -eq $MAX_RETRIES ]; then
+            echo "WARNING: InfluxDB health check failed after $MAX_RETRIES attempts. Continuing anyway..."
+            break
+        fi
+        
+        echo "Waiting for InfluxDB to be ready... (attempt $retry_count/$MAX_RETRIES)"
+        sleep $RETRY_INTERVAL
     done
-    echo "InfluxDB is ready!"
 fi
 
+# Check if PostgreSQL is available
 if [ ! -z "$POSTGRES_HOST" ]; then
-    until pg_isready -h "$POSTGRES_HOST" -p 5432; do
-        echo "Waiting for PostgreSQL to be ready..."
-        sleep 5
+    echo "Checking PostgreSQL at $POSTGRES_HOST:5432..."
+    
+    retry_count=0
+    while [ $retry_count -lt $MAX_RETRIES ]; do
+        if pg_isready -h "$POSTGRES_HOST" -p 5432 -q; then
+            echo "PostgreSQL is ready!"
+            break
+        fi
+        
+        retry_count=$((retry_count+1))
+        if [ $retry_count -eq $MAX_RETRIES ]; then
+            echo "WARNING: PostgreSQL health check failed after $MAX_RETRIES attempts. Continuing anyway..."
+            break
+        fi
+        
+        echo "Waiting for PostgreSQL to be ready... (attempt $retry_count/$MAX_RETRIES)"
+        sleep $RETRY_INTERVAL
     done
-    echo "PostgreSQL is ready!"
 fi
 
 # Update datasource configuration with environment variables
