@@ -92,7 +92,7 @@ This project provides a full-stack solution to collect, store, and visualize iRa
    ```
 
 4. **Access Grafana**:
-   Open http://localhost:3000 in your browser
+   Open http://localhost:3000 in your browser (or the port configured in your `.env` file if different)
    - Default credentials: admin/admin
    - You'll be prompted to change the password on first login
 
@@ -250,7 +250,7 @@ The project includes the following Grafana dashboards:
 
 ### Viewing Dashboards
 
-1. Open http://localhost:3000 in your browser
+1. Open Grafana in your browser at http://localhost:3000 (or the custom port configured in your `.env` file)
 2. Navigate to Dashboards > Browse
 3. Select one of the available iRacing dashboards
 
@@ -298,7 +298,8 @@ The project includes the following Grafana dashboards:
 
 4. **Docker Compose Issues**:
    - Verify Docker and Docker Compose are installed correctly
-   - Check that ports are not already in use (3000, 5432, 8086)
+   - Check that ports are not already in use (5432, 8086)
+   - The setup script automatically checks if port 3000 is already in use and configures an alternative port in that case
    - Restart the stack: `docker-compose down && docker-compose up -d`
 
 ### Platform-Specific Troubleshooting
