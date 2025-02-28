@@ -147,7 +147,7 @@ This project provides a full-stack solution to collect, store, and visualize iRa
    ```cmd
    copy .env.example .env
    # Edit .env with your credentials using Notepad or other text editor
-   # Make sure to set POSTGRES_HOST=localhost and INFLUXDB_URL=http://localhost:8086
+   # Make sure to set POSTGRES_HOST=localhost and PROMETHEUS_HOST=localhost
    ```
 
 3. **Run the setup script**:
@@ -235,7 +235,7 @@ To explore raw metrics, visit `http://localhost:8000/metrics` when the collector
    source venv/bin/activate
    
    # Run the collector script
-   python python/collectors/iracing_collector.py
+   python python/collectors/iracing_collector_prometheus.py
    ```
 
 2. **Using Docker**:
@@ -255,7 +255,7 @@ To explore raw metrics, visit `http://localhost:8000/metrics` when the collector
    venv\Scripts\activate
    
    # Run the collector script
-   python python\collectors\iracing_collector.py
+   python python\collectors\iracing_collector_prometheus.py
    ```
 
 2. **Using Docker**:
