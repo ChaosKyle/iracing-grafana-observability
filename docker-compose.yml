@@ -16,22 +16,16 @@ services:
     networks:
       - iracing-network
 
-  # InfluxDB for time-series telemetry data
-  influxdb:
-    image: influxdb:2.6
-    container_name: iracing-influxdb
+  # Prometheus for time-series telemetry data
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: iracing-prometheus
     restart: unless-stopped
-    environment:
-      DOCKER_INFLUXDB_INIT_MODE: setup
-      DOCKER_INFLUXDB_INIT_USERNAME: ${INFLUXDB_ADMIN_USER:-admin}
-      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUXDB_ADMIN_PASSWORD:-influxdb_password}
-      DOCKER_INFLUXDB_INIT_ORG: ${INFLUXDB_ORG:-iracing}
-      DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUXDB_BUCKET:-iracing_telemetry}
-      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_TOKEN:-}
     volumes:
-      - influxdb-data:/var/lib/influxdb2
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
     ports:
-      - "8086:8086"
+      - "9090:9090"
     networks:
       - iracing-network
 
@@ -44,10 +38,9 @@ services:
     restart: unless-stopped
     depends_on:
       - postgres
-      - influxdb
+      - prometheus
     environment:
-      INFLUXDB_HOST: influxdb
-      INFLUXDB_TOKEN: ${INFLUXDB_TOKEN:-}
+      PROMETHEUS_HOST: prometheus
       POSTGRES_HOST: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_password}
     ports:
@@ -64,7 +57,7 @@ services:
     restart: unless-stopped
     depends_on:
       - postgres
-      - influxdb
+      - prometheus
     environment:
       IRACING_USERNAME: ${IRACING_USERNAME}
       IRACING_PASSWORD: ${IRACING_PASSWORD}
@@ -73,11 +66,11 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_password}
       POSTGRES_DB: ${POSTGRES_DB:-iracing_data}
-      INFLUXDB_URL: http://influxdb:8086
-      INFLUXDB_TOKEN: ${INFLUXDB_TOKEN:-}
-      INFLUXDB_ORG: ${INFLUXDB_ORG:-iracing}
-      INFLUXDB_BUCKET: ${INFLUXDB_BUCKET:-iracing_telemetry}
+      PROMETHEUS_HOST: prometheus
+      PROMETHEUS_PORT: 9090
       COLLECTOR_CRON_SCHEDULE: ${COLLECTOR_CRON_SCHEDULE:-"0 */6 * * *"}
+    ports:
+      - "8000:8000"  # Expose metrics endpoint for Prometheus to scrape
     networks:
       - iracing-network
 
@@ -87,4 +80,4 @@ networks:
 
 volumes:
   postgres-data:
-  influxdb-data:
+  prometheus-data:
