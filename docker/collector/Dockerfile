@@ -23,12 +23,12 @@ COPY python/utils/ ./utils/
 ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app
 
-# Create a non-root user
-RUN useradd -m appuser
-USER appuser
-
-# Entry point script
+# Copy entry point script and set permissions
 COPY docker/collector/entrypoint.sh ./entrypoint.sh
 RUN chmod +x ./entrypoint.sh
+
+# Create a non-root user
+RUN useradd -m appuser 
+USER appuser
 
 CMD ["./entrypoint.sh"]

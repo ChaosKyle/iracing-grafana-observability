@@ -95,6 +95,60 @@ if [ ! -f ".env" ]; then
     echo "Please edit .env file with your credentials before continuing."
 fi
 
+# Check if port 3000 is already in use
+check_port_3000() {
+    echo "Checking if port 3000 is already in use..."
+    if [ "$OS" = "Windows" ]; then
+        # Check for port 3000 in use on Windows
+        netstat -an | findstr ":3000" > /dev/null && return 0 || return 1
+    else
+        # For Mac and Linux, first check if netcat is available
+        if command -v nc >/dev/null 2>&1; then
+            nc -z localhost 3000 >/dev/null 2>&1 && return 0 || return 1
+        else
+            # Fallback to lsof if netcat is not available
+            command -v lsof >/dev/null 2>&1 && lsof -i:3000 >/dev/null 2>&1 && return 0 || return 1
+        fi
+    fi
+}
+
+if check_port_3000; then
+    echo "Port 3000 is already in use."
+    
+    # Find a different available port (starting from 3001)
+    next_port=3001
+    while [ "$next_port" -le 3020 ]; do
+        if [ "$OS" = "Windows" ]; then
+            netstat -an | findstr ":$next_port" > /dev/null || break
+        else
+            if command -v nc >/dev/null 2>&1; then
+                nc -z localhost $next_port >/dev/null 2>&1 || break
+            else
+                command -v lsof >/dev/null 2>&1 && lsof -i:$next_port >/dev/null 2>&1 || break
+            fi
+        fi
+        next_port=$((next_port + 1))
+    done
+    
+    if [ "$next_port" -gt 3020 ]; then
+        echo "Warning: Could not find an available port between 3001-3020."
+        echo "Using port 3001 but it may conflict with existing services."
+        next_port=3001
+    fi
+    
+    echo "Configuring Grafana to use port $next_port instead of 3000"
+    if grep -q "^GRAFANA_PORT=" .env; then
+        # Update existing GRAFANA_PORT if it exists
+        sed -i.bak "s/^GRAFANA_PORT=.*/GRAFANA_PORT=$next_port/" .env
+    else
+        # Add GRAFANA_PORT if it doesn't exist
+        echo "GRAFANA_PORT=$next_port" >> .env
+    fi
+    echo "Grafana will be accessible at: http://localhost:$next_port"
+else
+    echo "Port 3000 is available for Grafana."
+fi
+
 # Create Docker volumes if they don't exist
 echo "Creating Docker volumes if they don't exist..."
 docker volume ls | grep -q "iracing-grafana-observability_postgres-data" || docker volume create iracing-grafana-observability_postgres-data
@@ -106,7 +160,13 @@ echo "Setup complete! Next steps:"
 echo
 echo "1. Edit .env file with your iRacing credentials and database passwords"
 echo "2. Start the stack with: docker-compose up -d"
-echo "3. Access Grafana at: http://localhost:3000 (default login: admin/admin)"
+# Get the configured Grafana port from .env if available
+if grep -q "^GRAFANA_PORT=" .env; then
+    GRAFANA_PORT=$(grep "^GRAFANA_PORT=" .env | cut -d= -f2)
+else
+    GRAFANA_PORT=3000
+fi
+echo "3. Access Grafana at: http://localhost:$GRAFANA_PORT (default login: admin/admin)"
 echo "4. To run the collector manually: python python/collectors/iracing_collector.py"
 echo
 echo "For more information, see the documentation in docs/ directory."
