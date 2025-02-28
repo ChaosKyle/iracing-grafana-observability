@@ -9,7 +9,7 @@ A comprehensive solution for collecting, storing, and visualizing iRacing teleme
 This project provides a full-stack solution to collect, store, and visualize iRacing data:
 
 - **Data Collection**: Python scripts to extract data from the iRacing API and telemetry files
-- **Storage**: PostgreSQL for historical race data and InfluxDB for time-series telemetry data
+- **Storage**: PostgreSQL for historical race data and Prometheus for time-series telemetry data
 - **Visualization**: Grafana dashboards for performance analysis and insights
 - **Containerization**: Docker images for all components
 - **Automation**: GitHub Actions workflows for CI/CD
@@ -77,13 +77,9 @@ This project provides a full-stack solution to collect, store, and visualize iRa
    POSTGRES_PASSWORD=your_secure_password
    POSTGRES_DB=iracing_data
    
-   # InfluxDB Configuration
-   INFLUXDB_URL=http://influxdb:8086
-   INFLUXDB_TOKEN=your_influxdb_token
-   INFLUXDB_ORG=iracing
-   INFLUXDB_BUCKET=iracing_telemetry
-   INFLUXDB_ADMIN_USER=admin
-   INFLUXDB_ADMIN_PASSWORD=your_secure_password
+   # Prometheus Configuration (replaces InfluxDB)
+   PROMETHEUS_HOST=prometheus
+   PROMETHEUS_PORT=9090
    ```
 
 3. **Start the stack**:
@@ -116,7 +112,7 @@ This project provides a full-stack solution to collect, store, and visualize iRa
    ```bash
    cp .env.example .env
    # Edit .env with your credentials
-   # Make sure to set POSTGRES_HOST=localhost and INFLUXDB_URL=http://localhost:8086
+   # Make sure to set POSTGRES_HOST=localhost and PROMETHEUS_HOST=localhost
    ```
 
 3. **Run the setup script**:
@@ -130,7 +126,7 @@ This project provides a full-stack solution to collect, store, and visualize iRa
 
 4. **Run the data collector**:
    ```bash
-   python python/collectors/iracing_collector.py
+   python python/collectors/iracing_collector_prometheus.py
    ```
 
 #### Windows
@@ -165,7 +161,7 @@ This project provides a full-stack solution to collect, store, and visualize iRa
 
 4. **Run the data collector**:
    ```cmd
-   python python\collectors\iracing_collector.py
+   python python\collectors\iracing_collector_prometheus.py
    ```
 
 ## GitHub Actions Workflows
@@ -203,6 +199,29 @@ The project includes the following Grafana dashboards:
 2. **Lap Times**: Detailed lap time analysis with comparisons
 3. **Performance Trends**: Long-term iRating and Safety Rating progression
 4. **Race Strategy**: Fuel usage, pit stop timing, and race planning tools
+
+## Metrics Architecture (Prometheus)
+
+This project uses Prometheus for time-series metrics storage, which provides several advantages:
+
+- **Native Grafana Integration**: Prometheus is natively supported by Grafana with built-in query editors
+- **Simple Configuration**: No complex token or authentication setup required
+- **Pull-Based Model**: Prometheus scrapes metrics from the collector, simplifying the architecture
+- **Powerful Query Language**: PromQL offers flexible and powerful querying capabilities
+
+### How Metrics Flow:
+
+1. The collector exposes metrics via an HTTP endpoint (`:8000/metrics`)
+2. Prometheus scrapes these metrics at regular intervals (every 15s by default)
+3. Grafana queries Prometheus for visualization
+
+### Metric Types:
+
+- **Counter**: Cumulative values that only increase (e.g., total laps completed)
+- **Gauge**: Values that can go up and down (e.g., current speed, RPM)
+- **Histogram**: Distribution of values (e.g., lap time distributions)
+
+To explore raw metrics, visit `http://localhost:8000/metrics` when the collector is running.
 
 ## Usage Guide
 
@@ -289,7 +308,7 @@ The project includes the following Grafana dashboards:
 2. **Database Connection Issues**:
    - Ensure database containers are running: `docker-compose ps`
    - Verify database credentials in environment variables
-   - Check database logs: `docker-compose logs postgres influxdb`
+   - Check database logs: `docker-compose logs postgres prometheus`
 
 3. **Dashboard Not Loading Data**:
    - Verify data source configuration in Grafana
@@ -298,7 +317,7 @@ The project includes the following Grafana dashboards:
 
 4. **Docker Compose Issues**:
    - Verify Docker and Docker Compose are installed correctly
-   - Check that ports are not already in use (5432, 8086)
+   - Check that ports are not already in use (5432, 9090, 8000)
    - The setup script automatically checks if port 3000 is already in use and configures an alternative port in that case
    - Restart the stack: `docker-compose down && docker-compose up -d`
 
@@ -342,7 +361,7 @@ MIT
 
 - [iRacing](https://www.iracing.com/) for their simulator and API
 - [Grafana](https://grafana.com/) for the visualization platform
-- [InfluxDB](https://www.influxdata.com/) for time-series data storage
+- [Prometheus](https://prometheus.io/) for time-series data storage
 - [PostgreSQL](https://www.postgresql.org/) for relational data storage
 - [pyRacing](https://github.com/Esterni/pyracing) for Python iRacing API client
 - [irsdk](https://github.com/kutu/pyirsdk) for iRacing telemetry access
