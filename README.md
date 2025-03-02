@@ -1,6 +1,6 @@
 # iRacing Grafana Observability
 
-A comprehensive solution for collecting, storing, and visualizing iRacing telemetry and performance data using Grafana with local Docker deployment.
+A comprehensive solution for collecting, storing, and visualizing iRacing telemetry and performance data using Grafana. Supports both local Docker deployment and Grafana Cloud for production use.
 
 ![iRacing Telemetry Dashboard](docs/images/dashboard-preview.png)
 
@@ -55,7 +55,11 @@ This project provides a full-stack solution to collect, store, and visualize iRa
 
 ## Setup and Installation
 
-### Quick Start with Docker Compose
+This project offers two deployment options:
+- **Local Development**: For testing and development on your own machine using Docker
+- **Grafana Cloud**: For production use with professional monitoring and dashboards
+
+### Local Development Setup with Docker Compose
 
 1. **Clone the repository**:
    ```bash
@@ -77,7 +81,7 @@ This project provides a full-stack solution to collect, store, and visualize iRa
    POSTGRES_PASSWORD=your_secure_password
    POSTGRES_DB=iracing_data
    
-   # Prometheus Configuration (replaces InfluxDB)
+   # Prometheus Configuration
    PROMETHEUS_HOST=prometheus
    PROMETHEUS_PORT=9090
    ```
@@ -91,6 +95,81 @@ This project provides a full-stack solution to collect, store, and visualize iRa
    Open http://localhost:3000 in your browser (or the port configured in your `.env` file if different)
    - Default credentials: admin/admin
    - You'll be prompted to change the password on first login
+
+### Grafana Cloud Production Setup
+
+For a more robust solution with better performance, uptime, and sharing capabilities, follow these steps to set up a Grafana Cloud environment:
+
+1. **Sign up for Grafana Cloud**:
+   - Go to [Grafana Cloud](https://grafana.com/products/cloud/) and sign up for a free account
+   - For hobby use, the free tier includes 10K metrics and 50GB logs, which is enough for personal iRacing data
+
+2. **Create a Grafana Cloud Stack**:
+   - In the Grafana Cloud portal, create a new stack (or use the default one)
+   - Note your stack name/slug (e.g., "my-iracing-data")
+
+3. **Get your Grafana Cloud API keys**:
+   - Navigate to your stack
+   - Go to "Security" → "API Keys"
+   - Create a new API key with Admin role (for Terraform to manage resources)
+   - Note this API key as your `grafana_cloud_api_key`
+   - Create another API key with Editor role for metrics publishing
+   - Note this key as your `grafana_metrics_api_key`
+
+4. **Get your organization ID**:
+   - In Grafana Cloud portal, go to your user profile
+   - Look for Organization ID in your organization settings
+   - Note this as your `grafana_cloud_org_id`
+
+5. **Configure Terraform variables**:
+   ```bash
+   cd terraform/environments/prod
+   cp terraform.tfvars.example terraform.tfvars
+   ```
+   
+6. **Edit the terraform.tfvars file with your Grafana Cloud information**:
+   ```
+   # Grafana Cloud settings
+   grafana_cloud_url = "https://your-stack-slug.grafana.net"
+   grafana_cloud_api_key = "your-grafana-cloud-api-key"
+   grafana_cloud_org_id = "your-org-id"
+   stack_slug = "your-stack-slug"
+   grafana_admin_user = "admin"
+   grafana_admin_pass = "strong-password"
+   
+   # Metrics publishing
+   grafana_metrics_publisher_id = "your-metrics-publisher-id"
+   grafana_metrics_api_key = "your-metrics-api-key"
+   
+   # Other settings can use the defaults
+   ```
+
+7. **Initialize and apply Terraform configuration**:
+   ```bash
+   terraform init
+   terraform apply
+   ```
+   
+   This will:
+   - Set up Grafana Cloud dashboards
+   - Configure your local Prometheus to remote_write to Grafana Cloud
+   - Create necessary API tokens
+
+8. **Start your local stack**:
+   ```bash
+   cd ../../..  # Back to project root
+   docker-compose up -d
+   ```
+
+9. **Access your Grafana Cloud instance**:
+   - Open your stack URL (e.g., https://your-stack-slug.grafana.net)
+   - Log in with your Grafana Cloud credentials
+   - Your dashboards should be automatically provisioned
+
+10. **Verify data flow**:
+    - Start the collector on your local machine
+    - Data should begin flowing to both your local Grafana and Grafana Cloud
+    - Check the Prometheus data source in Grafana Cloud to confirm it's receiving data
 
 ### Local Development Setup
 
@@ -193,12 +272,32 @@ Workflow settings are centralized in `.github/variables.yaml`, making it easy to
 
 ## Available Dashboards
 
-The project includes the following Grafana dashboards:
+The project includes the following Grafana dashboards in both local and cloud environments:
 
 1. **Car Telemetry**: Real-time and historical car performance data
 2. **Lap Times**: Detailed lap time analysis with comparisons
 3. **Performance Trends**: Long-term iRating and Safety Rating progression
 4. **Race Strategy**: Fuel usage, pit stop timing, and race planning tools
+
+## Deployment Options
+
+### Local Development (Docker)
+
+- Quick to set up on your own machine
+- Great for testing and personal use
+- All data stays on your computer
+- Limited sharing capabilities
+- Requires Docker running at all times to access data
+
+### Grafana Cloud (Recommended for Sharing)
+
+- Professional-grade infrastructure
+- Always available from any device
+- Easy to share dashboards with teammates
+- Free tier available for hobby use
+- Better performance and reliability
+- Remote write from local Prometheus for data collection
+- Automatic backups of your data
 
 ## Metrics Architecture (Prometheus)
 
@@ -320,6 +419,28 @@ To explore raw metrics, visit `http://localhost:8000/metrics` when the collector
    - Check that ports are not already in use (5432, 9090, 8000)
    - The setup script automatically checks if port 3000 is already in use and configures an alternative port in that case
    - Restart the stack: `docker-compose down && docker-compose up -d`
+   
+### Grafana Cloud Troubleshooting
+
+1. **Remote Write Not Working**:
+   - Check your API keys and credentials in `terraform.tfvars`
+   - Verify that your local Prometheus can reach the internet
+   - Check Prometheus logs: `docker-compose logs prometheus`
+   
+2. **Dashboards Not Showing in Grafana Cloud**:
+   - Verify Terraform applied successfully
+   - Check for errors in Terraform output
+   - Try running `terraform apply` again
+
+3. **API Key Issues**:
+   - API keys have different roles (Admin, Editor, Viewer)
+   - Make sure you're using an Admin key for Terraform
+   - Editor key should be used for metrics publishing
+   
+4. **Data Missing in Cloud But Present Locally**:
+   - Check the remote_write configuration in Prometheus
+   - Verify your Grafana Cloud stack is on a paid plan if you exceed free limits
+   - Check if metrics are being sent with `curl localhost:9090/api/v1/targets` to see scrape status
 
 ### Platform-Specific Troubleshooting
 
@@ -357,10 +478,37 @@ To explore raw metrics, visit `http://localhost:8000/metrics` when the collector
 
 MIT
 
+## Getting Help With Grafana Cloud
+
+If you're new to Grafana Cloud or having issues with the setup:
+
+1. **Grafana Cloud Documentation**:
+   - Visit [Grafana Cloud Documentation](https://grafana.com/docs/grafana-cloud/) for official guides
+   - Check the [Getting Started](https://grafana.com/docs/grafana-cloud/getting-started/) section
+
+2. **Free Tier Limitations**:
+   - The free tier includes 10,000 series metrics and 50GB of logs
+   - Check your usage in Grafana Cloud's "Usage & Billing" section
+   - For most iRacers, this should be sufficient unless you're collecting data very frequently
+
+3. **Community Support**:
+   - Join the [Grafana Community Forums](https://community.grafana.com/)
+   - Post on [r/iRacing](https://www.reddit.com/r/iRacing/) if you need help with the iRacing specific integration
+   
+4. **Creating an Account**:
+   - Visit [Grafana Cloud Signup](https://grafana.com/auth/sign-up/create-user)
+   - You can use your Google/GitHub account or create a new one with email
+   - No credit card required for the free tier
+
+5. **Upgrading**:
+   - If you find you need more capacity, paid tiers start at $49/month
+   - Team accounts allow sharing dashboards with multiple users
+
 ## Acknowledgements
 
 - [iRacing](https://www.iracing.com/) for their simulator and API
 - [Grafana](https://grafana.com/) for the visualization platform
+- [Grafana Cloud](https://grafana.com/products/cloud/) for the cloud-hosted option
 - [Prometheus](https://prometheus.io/) for time-series data storage
 - [PostgreSQL](https://www.postgresql.org/) for relational data storage
 - [pyRacing](https://github.com/Esterni/pyracing) for Python iRacing API client
