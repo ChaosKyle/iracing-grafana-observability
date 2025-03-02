@@ -5,37 +5,71 @@ on:
     branches: [ main, master ]
     paths:
       - 'terraform/modules/grafana/dashboards/**'
+      - 'terraform/modules/grafana_cloud/dashboards/**'
+      - 'python/utils/dashboard_validator.py'
+      - 'python/utils/check_dashboard_ids.py'
+      - '.github/workflows/dashboard-validator.yml'
   pull_request:
     branches: [ main, master ]
     paths:
       - 'terraform/modules/grafana/dashboards/**'
+      - 'terraform/modules/grafana_cloud/dashboards/**'
+      - 'python/utils/dashboard_validator.py'
+      - 'python/utils/check_dashboard_ids.py'
+      - '.github/workflows/dashboard-validator.yml'
   workflow_dispatch:
 
 env:
   PYTHON_VERSION: '3.10'
-  DASHBOARDS_PATH: 'terraform/modules/grafana/dashboards'
+  LOCAL_DASHBOARDS_PATH: 'terraform/modules/grafana/dashboards'
+  CLOUD_DASHBOARDS_PATH: 'terraform/modules/grafana_cloud/dashboards'
 
 jobs:
   validate:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
     
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install jsonschema pyyaml
     
-    - name: Validate JSON dashboards
+    - name: Validate Local Dashboards
       run: |
-        python python/utils/dashboard_validator.py ${{ env.DASHBOARDS_PATH }}
+        python python/utils/dashboard_validator.py ${{ env.LOCAL_DASHBOARDS_PATH }}
     
-    - name: Check dashboard IDs for uniqueness
+    - name: Check Local Dashboard IDs for uniqueness
       run: |
-        python python/utils/check_dashboard_ids.py ${{ env.DASHBOARDS_PATH }}
+        python python/utils/check_dashboard_ids.py ${{ env.LOCAL_DASHBOARDS_PATH }}
+        
+    - name: Validate Cloud Dashboards
+      if: hashFiles('terraform/modules/grafana_cloud/dashboards/*.json') != ''
+      run: |
+        python python/utils/dashboard_validator.py ${{ env.CLOUD_DASHBOARDS_PATH }}
+    
+    - name: Check Cloud Dashboard IDs for uniqueness
+      if: hashFiles('terraform/modules/grafana_cloud/dashboards/*.json') != ''
+      run: |
+        python python/utils/check_dashboard_ids.py ${{ env.CLOUD_DASHBOARDS_PATH }}
+        
+    - name: Compare Dashboard Sets
+      if: hashFiles('terraform/modules/grafana_cloud/dashboards/*.json') != ''
+      run: |
+        echo "Comparing local and cloud dashboards to ensure consistency..."
+        # Simple check to compare file counts
+        LOCAL_COUNT=$(ls ${{ env.LOCAL_DASHBOARDS_PATH }}/*.json 2>/dev/null | wc -l)
+        CLOUD_COUNT=$(ls ${{ env.CLOUD_DASHBOARDS_PATH }}/*.json 2>/dev/null | wc -l)
+        
+        if [ "$LOCAL_COUNT" != "$CLOUD_COUNT" ]; then
+          echo "::warning::Dashboard count mismatch: Local ($LOCAL_COUNT) vs Cloud ($CLOUD_COUNT)"
+        else
+          echo "Dashboard count matches: $LOCAL_COUNT dashboards in each environment"
+        fi

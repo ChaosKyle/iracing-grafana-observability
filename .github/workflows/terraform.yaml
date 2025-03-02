@@ -5,21 +5,35 @@ on:
     branches: [ main, master ]
     paths:
       - 'terraform/**'
+      - '.github/workflows/terraform.yaml'
   pull_request:
     branches: [ main, master ]
     paths:
       - 'terraform/**'
+      - '.github/workflows/terraform.yaml'
   schedule:
     - cron: '0 0 * * 0'  # Weekly on Sunday at midnight
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - prod
 
 permissions:
   contents: read
 
 jobs:
-  terraform:
-    name: 'Terraform'
+  terraform-dev:
+    name: 'Terraform Dev'
+    if: github.event.inputs.environment == 'dev' || github.event.inputs.environment == null
     runs-on: ubuntu-latest
     environment: dev
+    concurrency: terraform-dev
 
     # Use the Bash shell regardless whether the GitHub Actions runner is ubuntu-latest, macos-latest, or windows-latest
     defaults:
@@ -30,19 +44,27 @@ jobs:
     env:
       TF_VAR_grafana_auth: ${{ secrets.GRAFANA_AUTH }}
       TF_VAR_grafana_admin_pass: ${{ secrets.GRAFANA_ADMIN_PASS }}
-      TF_VAR_influxdb_admin_password: ${{ secrets.INFLUXDB_ADMIN_PASSWORD }}
       TF_VAR_postgres_password: ${{ secrets.POSTGRES_PASSWORD }}
 
     steps:
     # Checkout the repository to the GitHub Actions runner
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     # Install the latest version of Terraform CLI
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
       with:
         terraform_version: 1.3.7
+        
+    # Cache Terraform modules to speed up builds
+    - name: Cache Terraform
+      uses: actions/cache@v4
+      with:
+        path: ~/.terraform.d/plugin-cache
+        key: ${{ runner.os }}-terraform-${{ hashFiles('**/.terraform.lock.hcl') }}
+        restore-keys: |
+          ${{ runner.os }}-terraform-
 
     # Initialize a new or existing Terraform working directory by creating initial files, loading any remote state, downloading modules, etc.
     - name: Terraform Init
@@ -50,18 +72,90 @@ jobs:
 
     # Checks that all Terraform configuration files adhere to a canonical format
     - name: Terraform Format
-      run: terraform fmt -check
+      run: terraform fmt -check -recursive ../..
 
     # Validate the Terraform code
     - name: Terraform Validate
       run: terraform validate
 
-    # Generate Terraform plan for pull requests
+    # Generate Terraform plan
     - name: Terraform Plan
-      run: terraform plan -no-color
-      if: github.event_name == 'pull_request'
-
-    # Apply Terraform changes for main branch or scheduled runs
+      id: plan
+      run: terraform plan -no-color -input=false
+      continue-on-error: true
+      
+    - name: Check Terraform Plan Status
+      if: steps.plan.outcome == 'failure'
+      run: exit 1
+      
+    # Apply Terraform changes for main branch or scheduled runs or manual runs
     - name: Terraform Apply
-      if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && (github.event_name == 'push' || github.event_name == 'schedule')
-      run: terraform apply -auto-approve
+      if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+      run: terraform apply -auto-approve -input=false
+      
+  terraform-prod:
+    name: 'Terraform Prod'
+    if: github.event.inputs.environment == 'prod'
+    runs-on: ubuntu-latest
+    environment: prod
+    concurrency: terraform-prod
+
+    # Use the Bash shell regardless whether the GitHub Actions runner is ubuntu-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: ./terraform/environments/prod
+    
+    env:
+      TF_VAR_grafana_cloud_api_key: ${{ secrets.GRAFANA_CLOUD_API_KEY }}
+      TF_VAR_grafana_cloud_org_id: ${{ secrets.GRAFANA_CLOUD_ORG_ID }}
+      TF_VAR_grafana_admin_pass: ${{ secrets.GRAFANA_ADMIN_PASS }}
+      TF_VAR_grafana_metrics_api_key: ${{ secrets.GRAFANA_METRICS_API_KEY }}
+      TF_VAR_grafana_metrics_publisher_id: ${{ secrets.GRAFANA_METRICS_PUBLISHER_ID }}
+      TF_VAR_postgres_password: ${{ secrets.POSTGRES_PASSWORD }}
+
+    steps:
+    # Checkout the repository to the GitHub Actions runner
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    # Install the latest version of Terraform CLI
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: 1.3.7
+        
+    # Cache Terraform modules to speed up builds
+    - name: Cache Terraform
+      uses: actions/cache@v4
+      with:
+        path: ~/.terraform.d/plugin-cache
+        key: ${{ runner.os }}-terraform-${{ hashFiles('**/.terraform.lock.hcl') }}
+        restore-keys: |
+          ${{ runner.os }}-terraform-
+
+    # Initialize a new or existing Terraform working directory by creating initial files, loading any remote state, downloading modules, etc.
+    - name: Terraform Init
+      run: terraform init
+
+    # Checks that all Terraform configuration files adhere to a canonical format
+    - name: Terraform Format
+      run: terraform fmt -check -recursive ../..
+
+    # Validate the Terraform code
+    - name: Terraform Validate
+      run: terraform validate
+
+    # Generate Terraform plan
+    - name: Terraform Plan
+      id: plan
+      run: terraform plan -no-color -input=false
+      continue-on-error: true
+      
+    - name: Check Terraform Plan Status
+      if: steps.plan.outcome == 'failure'
+      run: exit 1
+      
+    # Apply Terraform changes for manual runs - prod only runs on manual workflow dispatch
+    - name: Terraform Apply
+      run: terraform apply -auto-approve -input=false
