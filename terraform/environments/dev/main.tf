@@ -12,6 +12,9 @@ terraform {
       source  = "hashicorp/kubernetes"
       version = "~> 2.16.0"
     }
+    local = {
+      source  = "hashicorp/local"
+    }
   }
   
   backend "local" {
@@ -39,7 +42,7 @@ module "grafana" {
   grafana_url         = var.grafana_url
   grafana_admin_user  = var.grafana_admin_user
   grafana_admin_pass  = var.grafana_admin_pass
-  influxdb_url        = module.influxdb.influxdb_url
+  prometheus_url      = module.prometheus.prometheus_url
   postgres_host       = module.postgres.postgres_host
   postgres_port       = module.postgres.postgres_port
   postgres_user       = var.postgres_user
@@ -47,13 +50,11 @@ module "grafana" {
   postgres_database   = var.postgres_database
 }
 
-module "influxdb" {
-  source = "../../modules/influxdb"
+module "prometheus" {
+  source = "../../modules/prometheus"
   
-  influxdb_admin_user     = var.influxdb_admin_user
-  influxdb_admin_password = var.influxdb_admin_password
-  influxdb_org            = var.influxdb_org
-  influxdb_bucket         = var.influxdb_bucket
+  prometheus_data_path = var.prometheus_data_path
+  prometheus_port      = var.prometheus_port
 }
 
 module "postgres" {
