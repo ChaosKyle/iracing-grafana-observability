@@ -35,7 +35,7 @@ This document outlines the CI/CD workflows for the iRacing Grafana Observability
                     └────────┬────────┘
                              │
                     ┌────────▼────────┐
-                    │     Tag     │
+                    │     Tag         │
                     │     Creation    │
                     └─────────────────┘
 ```
