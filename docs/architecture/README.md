@@ -4,6 +4,8 @@
 
 The iRacing Grafana Observability Project is designed with a modular architecture to collect, store, process, and visualize iRacing telemetry and performance data.
 
+### Local Development Architecture
+
 ```
 ┌───────────────┐     ┌───────────────┐     ┌───────────────┐
 │               │     │               │     │               │
@@ -16,9 +18,41 @@ The iRacing Grafana Observability Project is designed with a modular architectur
                       ┌───────────────┐     ┌───────────────┐
                       │               │     │               │
                       │  Time-Series  │     │  Grafana      │
-                      │  Database     │────►│  Dashboards   │
-                      │  (InfluxDB)   │     │               │
+                      │  Metrics      │────►│  Dashboards   │
+                      │  (Prometheus) │     │  (Local)      │
                       └───────────────┘     └───────────────┘
+```
+
+### Cloud Production Architecture
+
+```
+┌───────────────┐     ┌───────────────┐     ┌───────────────┐
+│               │     │               │     │               │
+│  iRacing API  │     │ Telemetry     │     │  Race Results │
+│  & Telemetry  │◄────┤ Collector     │────►│  Database     │
+│               │     │ (Python)      │     │  (PostgreSQL) │
+└───────────────┘     └───────┬───────┘     └───────┬───────┘
+                              │                     │
+                              ▼                     │
+                      ┌───────────────┐             │
+                      │               │             │
+                      │  Prometheus   │             │
+                      │  Metrics      │             │
+                      │  (Local)      │             │
+                      └───────┬───────┘             │
+                              │                     │
+                              │ remote_write        │
+                              ▼                     ▼
+                      ┌───────────────────────────────────┐
+                      │                                   │
+                      │           Grafana Cloud           │
+                      │  ┌─────────────┐ ┌─────────────┐  │
+                      │  │ Prometheus  │ │ PostgreSQL  │  │
+                      │  │ Data Source │ │ Data Source │  │
+                      │  └─────────────┘ └─────────────┘  │
+                      │           Dashboards              │
+                      │                                   │
+                      └───────────────────────────────────┘
 ```
 
 ## Component Breakdown
@@ -34,11 +68,14 @@ The iRacing Grafana Observability Project is designed with a modular architectur
 
 3. **Data Storage**
    - PostgreSQL: Stores structured data like race results, driver profiles, and track information
-   - InfluxDB: Stores time-series telemetry data for high-performance querying
+   - Prometheus: Stores time-series metrics for telemetry data with efficient querying
 
 4. **Visualization**
    - Grafana: Provides dashboards for visualization and analysis
    - Custom dashboards organized by category (performance, telemetry, strategy, trends)
+   - Two deployment options:
+     - Local Grafana instance for development
+     - Grafana Cloud for production with enhanced features
 
 5. **Deployment**
    - Docker containers for all components
@@ -47,12 +84,23 @@ The iRacing Grafana Observability Project is designed with a modular architectur
 
 ## Data Flow
 
+### Local Development Flow
+
 1. The collector authenticates with iRacing API and retrieves race results and driver data
-2. Telemetry files are processed and transformed into time-series data points
+2. Telemetry files are processed and transformed into Prometheus metrics
 3. Structured data is stored in PostgreSQL tables with appropriate relations
-4. Time-series telemetry data is stored in InfluxDB buckets
-5. Grafana queries both data sources to render dashboards and visualizations
-6. Users interact with the Grafana interface to analyze their racing performance
+4. Metrics are exposed via an HTTP endpoint and scraped by Prometheus
+5. Local Grafana queries both data sources to render dashboards
+6. Users interact with the local Grafana interface to analyze their racing performance
+
+### Cloud Production Flow
+
+1. Same local collection process occurs on the user's machine
+2. Telemetry metrics are collected by local Prometheus
+3. Prometheus remote_writes metrics to Grafana Cloud Prometheus
+4. PostgreSQL data is exposed via port forwarding or cloud DB connection
+5. Grafana Cloud dashboards query both data sources
+6. Users access Grafana Cloud from any device without needing their local system running
 
 ## Security Considerations
 
@@ -68,9 +116,19 @@ The iRacing Grafana Observability Project is designed with a modular architectur
 - Docker Compose for local stack deployment
 - Direct Python script execution
 - Local Grafana instance
+- Prometheus for metric storage
 
-### Cloud Deployment
+### Grafana Cloud Production
+- Terraform-managed Grafana Cloud resources
+- Local Prometheus with remote_write to Grafana Cloud
+- Local PostgreSQL database (with option for cloud DB)
+- Metrics visible from any device via Grafana Cloud
+- Shared dashboards with team members
+- Enhanced performance and reliability
+
+### Self-Hosted Cloud (Alternative)
 - Terraform modules for AWS/GCP/Azure deployment
-- Managed database services for PostgreSQL and InfluxDB
+- Managed database services for PostgreSQL
+- Managed Prometheus service or self-hosted
 - Containerized collector running on schedule
-- Hosted Grafana service or self-hosted on cloud VMs
+- Self-hosted Grafana service on cloud VMs
