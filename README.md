@@ -2,7 +2,7 @@
 
 A comprehensive solution for collecting, storing, and visualizing iRacing telemetry and performance data using Grafana. Supports both local Docker deployment and Grafana Cloud for production use.
 
-![iRacing Telemetry Dashboard]<putapicherewhenyougetitworking>
+![iRacing Telemetry Dashboard]<->putapicherewhenyougetitworking<->
 
 ## Overview
 
