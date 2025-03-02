@@ -14,16 +14,9 @@ variable "grafana_admin_pass" {
   sensitive   = true
 }
 
-variable "influxdb_url" {
-  description = "InfluxDB URL"
+variable "prometheus_url" {
+  description = "Prometheus URL"
   type        = string
-}
-
-variable "influxdb_token" {
-  description = "InfluxDB access token"
-  type        = string
-  sensitive   = true
-  default     = ""
 }
 
 variable "postgres_host" {

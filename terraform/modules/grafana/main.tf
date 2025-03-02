@@ -1,3 +1,11 @@
+terraform {
+  required_providers {
+    grafana = {
+      source  = "grafana/grafana"
+    }
+  }
+}
+
 resource "grafana_folder" "performance" {
   title = "iRacing Performance"
 }
@@ -14,21 +22,16 @@ resource "grafana_folder" "trends" {
   title = "iRacing Trends"
 }
 
-# InfluxDB Data Source
-resource "grafana_data_source" "influxdb" {
-  type       = "influxdb"
-  name       = "InfluxDB-iRacing"
-  url        = var.influxdb_url
+# Prometheus Data Source
+resource "grafana_data_source" "prometheus" {
+  type       = "prometheus"
+  name       = "Prometheus-iRacing"
+  url        = var.prometheus_url
   is_default = true
   
   json_data {
-    default_bucket = "iracing_telemetry"
-    organization   = "iracing"
-    version        = "Flux"
-  }
-  
-  secure_json_data {
-    token = var.influxdb_token
+    http_method     = "GET"
+    time_interval   = "15s"
   }
 }
 

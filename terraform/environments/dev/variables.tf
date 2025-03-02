@@ -24,24 +24,14 @@ variable "docker_host" {
   default     = "unix:///var/run/docker.sock"
 }
 
-variable "influxdb_admin_user" {
-  description = "InfluxDB admin username"
-  default     = "admin"
+variable "prometheus_data_path" {
+  description = "Path to store Prometheus data"
+  default     = "/var/lib/prometheus"
 }
 
-variable "influxdb_admin_password" {
-  description = "InfluxDB admin password"
-  sensitive   = true
-}
-
-variable "influxdb_org" {
-  description = "InfluxDB organization name"
-  default     = "iracing"
-}
-
-variable "influxdb_bucket" {
-  description = "InfluxDB bucket name"
-  default     = "iracing_telemetry"
+variable "prometheus_port" {
+  description = "External port for Prometheus"
+  default     = 9090
 }
 
 variable "postgres_user" {
