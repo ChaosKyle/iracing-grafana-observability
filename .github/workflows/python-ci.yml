@@ -5,10 +5,12 @@ on:
     branches: [ main, master ]
     paths:
       - 'python/**'
+      - '.github/workflows/python-ci.yml'
   pull_request:
     branches: [ main, master ]
     paths:
       - 'python/**'
+      - '.github/workflows/python-ci.yml'
   workflow_dispatch:
 
 env:
@@ -21,17 +23,18 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
     
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install flake8 pytest
+        pip install flake8 pytest pytest-cov
         pip install -r ${{ env.PYTHON_PATH }}/requirements.txt
     
     - name: Lint with flake8
@@ -42,8 +45,22 @@ jobs:
         flake8 ${{ env.PYTHON_PATH }}/ --count --exit-zero --max-complexity=${{ env.MAX_COMPLEXITY }} --max-line-length=${{ env.MAX_LINE_LENGTH }} --statistics
     
     - name: Test with pytest
+      if: hashFiles('python/tests/*.py') != ''
       run: |
-        # For this demonstration, we're just setting up the test structure
-        # In a real setup, you'd run actual tests here
-        # pytest ${{ env.PYTHON_PATH }}/tests/
-        echo "Tests would run here if they existed"
+        pytest ${{ env.PYTHON_PATH }}/tests/ --cov=${{ env.PYTHON_PATH }} --cov-report=xml
+      
+    - name: Check test directory
+      if: hashFiles('python/tests/*.py') == ''
+      run: |
+        echo "::warning::No test files found in python/tests/"
+        echo "Test directory exists but contains no tests. Add tests for better code quality."
+        
+    - name: Upload coverage to Codecov
+      if: hashFiles('python/tests/*.py') != ''
+      uses: codecov/codecov-action@v4
+      with:
+        files: ./coverage.xml
+        fail_ci_if_error: false
+        verbose: true
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
