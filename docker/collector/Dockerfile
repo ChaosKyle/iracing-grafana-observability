@@ -24,11 +24,16 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app
 
 # Copy entry point script and set permissions
-COPY docker/collector/entrypoint.sh ./entrypoint.sh
-RUN chmod +x ./entrypoint.sh
+COPY docker/collector/entrypoint.sh .
+RUN chmod +x entrypoint.sh
 
-# Create a non-root user
-RUN useradd -m appuser 
+# Create a non-root user and give proper permissions
+RUN useradd -m appuser && \
+    chown -R appuser:appuser /app && \
+    chmod -R 755 /app
+
+# Switch to appuser
 USER appuser
 
-CMD ["./entrypoint.sh"]
+# Use explicit shell and path for entrypoint
+ENTRYPOINT ["/bin/bash", "/app/entrypoint.sh"]

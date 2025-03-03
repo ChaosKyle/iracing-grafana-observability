@@ -14,9 +14,6 @@ if [ -z "$POSTGRES_HOST" ] || [ -z "$PROMETHEUS_HOST" ]; then
     exit 1
 fi
 
-# Create a .env file based on environment variables
-env | grep -E '^(IRACING_|POSTGRES_|PROMETHEUS_)' > .env
-
 echo "Starting iRacing data collector with Prometheus metrics endpoint..."
 
 # Run the iRacing collector with the Prometheus version

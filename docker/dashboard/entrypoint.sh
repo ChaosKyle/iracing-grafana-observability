@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # Entrypoint script for the Grafana dashboard container
 
 # Wait for Prometheus and PostgreSQL to be ready
