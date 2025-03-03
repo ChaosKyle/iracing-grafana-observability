@@ -64,7 +64,7 @@ jobs:
           type=ref,event=pr
     
     - name: Build collector image
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@v6
       with:
         context: .
         file: ${{ env.DOCKER_PATH }}/collector/Dockerfile
@@ -75,7 +75,7 @@ jobs:
         cache-to: type=gha,mode=max
     
     - name: Build dashboard image
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@v6
       with:
         context: .
         file: ${{ env.DOCKER_PATH }}/dashboard/Dockerfile
