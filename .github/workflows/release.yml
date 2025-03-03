@@ -59,7 +59,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
       
       - name: Build and push collector image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: docker/collector/Dockerfile
@@ -71,7 +71,7 @@ jobs:
           cache-to: type=gha,mode=max
             
       - name: Build and push dashboard image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: docker/dashboard/Dockerfile
