@@ -2,6 +2,7 @@
 # File: python/utils/db_connector.py
 import os
 import logging
+import traceback
 import psycopg2
 from psycopg2.extras import DictCursor
 from dotenv import load_dotenv
@@ -31,12 +32,36 @@ class PostgresConnector:
             logger.info("Successfully connected to PostgreSQL")
         except Exception as e:
             logger.error(f"Failed to connect to PostgreSQL: {e}")
+            logger.error(f"PostgreSQL connection error details: {traceback.format_exc()}")
             raise
     
     def __del__(self):
         """Close the connection when the object is destroyed"""
         if hasattr(self, 'conn') and self.conn:
             self.conn.close()
+            
+    def check_connection(self):
+        """Check if the PostgreSQL connection is active"""
+        try:
+            with self.conn.cursor() as cursor:
+                cursor.execute("SELECT 1")
+                result = cursor.fetchone()
+                if result and result[0] == 1:
+                    return True
+                else:
+                    raise RuntimeError("PostgreSQL connection test failed")
+        except Exception as e:
+            logger.error(f"PostgreSQL connection check failed: {e}")
+            logger.error(f"Connection check error details: {traceback.format_exc()}")
+            # Try to reconnect
+            try:
+                self.conn = psycopg2.connect(**self.conn_params)
+                self.conn.autocommit = False
+                logger.info("Successfully reconnected to PostgreSQL")
+                return True
+            except Exception as reconnect_error:
+                logger.error(f"Failed to reconnect to PostgreSQL: {reconnect_error}")
+                raise RuntimeError(f"PostgreSQL connection is down: {e}")
     
     def session_exists(self, iracing_session_id):
         """Check if a session already exists in the database"""
@@ -49,6 +74,7 @@ class PostgresConnector:
                 return cursor.fetchone() is not None
         except Exception as e:
             logger.error(f"Error checking if session exists: {e}")
+            logger.error(f"Session check error details: {traceback.format_exc()}")
             self.conn.rollback()
             return False
     
@@ -102,6 +128,7 @@ class PostgresConnector:
                 return track_id
         except Exception as e:
             logger.error(f"Error upserting track: {e}")
+            logger.error(f"Track upsert error details: {traceback.format_exc()}")
             self.conn.rollback()
             raise
     
@@ -151,6 +178,7 @@ class PostgresConnector:
                 return car_id
         except Exception as e:
             logger.error(f"Error upserting car: {e}")
+            logger.error(f"Car upsert error details: {traceback.format_exc()}")
             self.conn.rollback()
             raise
     
@@ -208,6 +236,7 @@ class PostgresConnector:
                 return driver_id
         except Exception as e:
             logger.error(f"Error upserting driver profile: {e}")
+            logger.error(f"Driver profile upsert error details: {traceback.format_exc()}")
             self.conn.rollback()
             raise
     
@@ -223,6 +252,7 @@ class PostgresConnector:
                 return result[0] if result else None
         except Exception as e:
             logger.error(f"Error getting driver ID: {e}")
+            logger.error(f"Driver ID lookup error details: {traceback.format_exc()}")
             return None
     
     def insert_session(self, session_data):
@@ -253,6 +283,7 @@ class PostgresConnector:
                 return session_id
         except Exception as e:
             logger.error(f"Error inserting session: {e}")
+            logger.error(f"Session insert error details: {traceback.format_exc()}")
             self.conn.rollback()
             raise
     
@@ -284,6 +315,7 @@ class PostgresConnector:
                 self.conn.commit()
         except Exception as e:
             logger.error(f"Error inserting lap: {e}")
+            logger.error(f"Lap insert error details: {traceback.format_exc()}")
             self.conn.rollback()
             raise
     
@@ -318,6 +350,7 @@ class PostgresConnector:
                 self.conn.commit()
         except Exception as e:
             logger.error(f"Error inserting race result: {e}")
+            logger.error(f"Race result insert error details: {traceback.format_exc()}")
             self.conn.rollback()
             raise
     
@@ -342,6 +375,7 @@ class PostgresConnector:
                 return cursor.fetchall()
         except Exception as e:
             logger.error(f"Error getting lap times by track: {e}")
+            logger.error(f"Lap times query error details: {traceback.format_exc()}")
             return []
     
     def get_recent_results(self, limit=10):
@@ -366,4 +400,5 @@ class PostgresConnector:
                 return cursor.fetchall()
         except Exception as e:
             logger.error(f"Error getting recent results: {e}")
+            logger.error(f"Recent results query error details: {traceback.format_exc()}")
             return []
