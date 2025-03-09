@@ -31,7 +31,7 @@ class TestiRacingCollector(unittest.TestCase):
         self.mock_influx = mock_influx.return_value
         
         # Skip the actual pyracing client initialization
-        with patch('collectors.iracing_collector.pyracing'):
+        with patch('collectors.iracing_collector.Client'):
             self.collector = iRacingCollector()
             self.collector.ir = MagicMock()
     
