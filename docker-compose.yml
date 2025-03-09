@@ -1,83 +1,84 @@
-services:
-  # PostgreSQL for historical race data
-  postgres:
-    image: postgres:14
-    container_name: iracing-postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_password}
-      POSTGRES_DB: ${POSTGRES_DB:-iracing_data}
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-      - ./terraform/modules/postgres/schema.sql:/docker-entrypoint-initdb.d/init.sql
-    ports:
-      - "5432:5432"
-    networks:
-      - iracing-network
-
-  # Prometheus for time-series telemetry data
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: iracing-prometheus
-    restart: unless-stopped
-    volumes:
-      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus-data:/prometheus
-    ports:
-      - "9090:9090"
-    networks:
-      - iracing-network
-
-  # Grafana for visualization
-  grafana:
-    build:
-      context: .
-      dockerfile: docker/dashboard/Dockerfile
-    container_name: iracing-grafana
-    restart: unless-stopped
-    depends_on:
-      - postgres
-      - prometheus
-    environment:
-      PROMETHEUS_HOST: prometheus
-      POSTGRES_HOST: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_password}
-    ports:
-      - "${GRAFANA_PORT:-3000}:3000"
-    networks:
-      - iracing-network
-
-  # iRacing data collector
-  collector:
-    build:
-      context: .
-      dockerfile: docker/collector/Dockerfile
-    container_name: iracing-collector
-    restart: unless-stopped
-    depends_on:
-      - postgres
-      - prometheus
-    environment:
-      IRACING_USERNAME: ${IRACING_USERNAME}
-      IRACING_PASSWORD: ${IRACING_PASSWORD}
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: 5432
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_password}
-      POSTGRES_DB: ${POSTGRES_DB:-iracing_data}
-      PROMETHEUS_HOST: prometheus
-      PROMETHEUS_PORT: 9090
-      COLLECTOR_CRON_SCHEDULE: ${COLLECTOR_CRON_SCHEDULE:-"0 */6 * * *"}
-    ports:
-      - "8000:8000"  # Expose metrics endpoint for Prometheus to scrape
-    networks:
-      - iracing-network
-
-networks:
-  iracing-network:
-    driver: bridge
-
-volumes:
-  postgres-data:
+services:
+  # PostgreSQL for historical race data
+  postgres:
+    image: postgres:14
+    container_name: iracing-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_password}
+      POSTGRES_DB: ${POSTGRES_DB:-iracing_data}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./terraform/modules/postgres/schema.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - iracing-network
+
+  # Prometheus for time-series telemetry data
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: iracing-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - iracing-network
+
+  # Grafana for visualization
+  grafana:
+    build:
+      context: .
+      dockerfile: docker/dashboard/Dockerfile
+    container_name: iracing-grafana
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - prometheus
+    environment:
+      PROMETHEUS_HOST: prometheus
+      POSTGRES_HOST: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_password}
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    networks:
+      - iracing-network
+
+  # iRacing data collector
+  collector:
+    build:
+      context: .
+      dockerfile: docker/collector/Dockerfile
+    container_name: iracing-collector
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - prometheus
+    environment:
+      IRACING_USERNAME: ${IRACING_USERNAME}
+      IRACING_PASSWORD: ${IRACING_PASSWORD}
+      IRACING_CUSTOMER_ID: ${IRACING_CUSTOMER_ID:-1002825}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_password}
+      POSTGRES_DB: ${POSTGRES_DB:-iracing_data}
+      PROMETHEUS_HOST: prometheus
+      PROMETHEUS_PORT: 9090
+      COLLECTOR_CRON_SCHEDULE: ${COLLECTOR_CRON_SCHEDULE:-"0 */6 * * *"}
+    ports:
+      - "8000:8000"  # Expose metrics endpoint for Prometheus to scrape
+    networks:
+      - iracing-network
+
+networks:
+  iracing-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
   prometheus-data:

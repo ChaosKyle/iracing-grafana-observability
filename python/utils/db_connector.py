@@ -7,8 +7,9 @@ import psycopg2
 from psycopg2.extras import DictCursor
 from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+# Load environment variables from the local .env file
+dotenv_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
+load_dotenv(dotenv_path=dotenv_path)
 
 # Configure logging
 logger = logging.getLogger("postgres_connector")
@@ -18,13 +19,28 @@ class PostgresConnector:
     
     def __init__(self):
         """Initialize the PostgreSQL connection"""
+        # Get Postgres port (handle incorrectly set environment variables)
+        postgres_port = os.getenv("POSTGRES_PORT", "5432")
+        try:
+            postgres_port = int(postgres_port)
+        except ValueError:
+            # If the port is incorrectly set to a string like "localhost", use the default
+            logger.warning(f"Invalid PostgreSQL port: {postgres_port}, using default 5432")
+            postgres_port = 5432
+            
         self.conn_params = {
             "host": os.getenv("POSTGRES_HOST", "localhost"),
-            "port": os.getenv("POSTGRES_PORT", "5432"),
+            "port": postgres_port,
             "user": os.getenv("POSTGRES_USER", "postgres"),
             "password": os.getenv("POSTGRES_PASSWORD", "postgres"),
             "database": os.getenv("POSTGRES_DB", "iracing_data")
         }
+        
+        # Check if we should skip PostgreSQL connection (for testing)
+        if os.getenv("USE_POSTGRES", "true").lower() == "false":
+            logger.info("Skipping PostgreSQL connection (USE_POSTGRES=false)")
+            self.conn = None
+            return
         
         try:
             self.conn = psycopg2.connect(**self.conn_params)
@@ -42,6 +58,10 @@ class PostgresConnector:
             
     def check_connection(self):
         """Check if the PostgreSQL connection is active"""
+        # Skip if disabled
+        if os.getenv("USE_POSTGRES", "true").lower() == "false":
+            return True
+            
         try:
             with self.conn.cursor() as cursor:
                 cursor.execute("SELECT 1")
@@ -65,6 +85,10 @@ class PostgresConnector:
     
     def session_exists(self, iracing_session_id):
         """Check if a session already exists in the database"""
+        # Skip if disabled
+        if os.getenv("USE_POSTGRES", "true").lower() == "false":
+            return False
+            
         try:
             with self.conn.cursor() as cursor:
                 cursor.execute(
@@ -80,6 +104,10 @@ class PostgresConnector:
     
     def upsert_track(self, track_data):
         """Insert or update track information and return the track ID"""
+        # Skip if disabled
+        if os.getenv("USE_POSTGRES", "true").lower() == "false":
+            return 1
+            
         try:
             with self.conn.cursor() as cursor:
                 # Check if track exists
@@ -134,6 +162,10 @@ class PostgresConnector:
     
     def upsert_car(self, car_data):
         """Insert or update car information and return the car ID"""
+        # Skip if disabled
+        if os.getenv("USE_POSTGRES", "true").lower() == "false":
+            return 1
+            
         try:
             with self.conn.cursor() as cursor:
                 # Check if car exists
@@ -184,6 +216,10 @@ class PostgresConnector:
     
     def upsert_driver_profile(self, driver_data):
         """Insert or update driver profile and return the driver ID"""
+        # Skip if disabled
+        if os.getenv("USE_POSTGRES", "true").lower() == "false":
+            return 1
+            
         try:
             with self.conn.cursor() as cursor:
                 # Check if driver exists
@@ -242,6 +278,10 @@ class PostgresConnector:
     
     def get_driver_id(self, iracing_id):
         """Get the driver ID from the iracing_id"""
+        # Skip if disabled
+        if os.getenv("USE_POSTGRES", "true").lower() == "false":
+            return 1
+            
         try:
             with self.conn.cursor() as cursor:
                 cursor.execute(
@@ -257,6 +297,10 @@ class PostgresConnector:
     
     def insert_session(self, session_data):
         """Insert session information and return the session ID"""
+        # Skip if disabled
+        if os.getenv("USE_POSTGRES", "true").lower() == "false":
+            return 1
+            
         try:
             with self.conn.cursor() as cursor:
                 cursor.execute(
@@ -289,6 +333,10 @@ class PostgresConnector:
     
     def insert_lap(self, lap_data):
         """Insert lap information"""
+        # Skip if disabled
+        if os.getenv("USE_POSTGRES", "true").lower() == "false":
+            return
+            
         try:
             with self.conn.cursor() as cursor:
                 cursor.execute(
@@ -321,6 +369,10 @@ class PostgresConnector:
     
     def insert_race_result(self, result_data):
         """Insert race result information"""
+        # Skip if disabled
+        if os.getenv("USE_POSTGRES", "true").lower() == "false":
+            return
+            
         try:
             with self.conn.cursor() as cursor:
                 cursor.execute(
@@ -356,6 +408,10 @@ class PostgresConnector:
     
     def get_lap_times_by_track(self, track_id, limit=100):
         """Get lap times for a specific track"""
+        # Skip if disabled
+        if os.getenv("USE_POSTGRES", "true").lower() == "false":
+            return []
+            
         try:
             with self.conn.cursor(cursor_factory=DictCursor) as cursor:
                 cursor.execute(
@@ -380,6 +436,10 @@ class PostgresConnector:
     
     def get_recent_results(self, limit=10):
         """Get recent race results"""
+        # Skip if disabled
+        if os.getenv("USE_POSTGRES", "true").lower() == "false":
+            return []
+            
         try:
             with self.conn.cursor(cursor_factory=DictCursor) as cursor:
                 cursor.execute(

@@ -38,8 +38,9 @@ if DEBUG_MODE:
     logger.setLevel(logging.DEBUG)
     logger.debug("Debug mode enabled")
 
-# Load environment variables
-load_dotenv()
+# Load environment variables from the local .env file
+dotenv_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+load_dotenv(dotenv_path=dotenv_path)
 
 class iRacingCollector:
     """Collects data from iRacing API and stores it in PostgreSQL and InfluxDB"""
@@ -73,8 +74,8 @@ class iRacingCollector:
         
         # Import pyracing here to handle any import issues gracefully
         try:
-            import pyracing
-            self.ir = pyracing.Client(self.username, self.password)
+            from pyracing.client import Client
+            self.ir = Client(self.username, self.password)
             logger.info("Successfully initialized pyracing client")
         except ImportError:
             logger.error("Failed to import pyracing. Make sure it's installed.")
