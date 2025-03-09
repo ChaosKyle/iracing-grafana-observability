@@ -4,6 +4,7 @@ import sys
 import json
 import time
 import logging
+import traceback
 from datetime import datetime, timedelta
 
 # Handle import dependencies gracefully
@@ -23,13 +24,19 @@ from utils.influx_connector import InfluxConnector
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s - %(pathname)s:%(lineno)d',
     handlers=[
         logging.FileHandler("iracing_collector.log"),
         logging.StreamHandler()
     ]
 )
 logger = logging.getLogger("iracing_collector")
+
+# Set up more verbose logging for debugging if needed
+DEBUG_MODE = os.getenv("DEBUG_MODE", "false").lower() == "true"
+if DEBUG_MODE:
+    logger.setLevel(logging.DEBUG)
+    logger.debug("Debug mode enabled")
 
 # Load environment variables
 load_dotenv()
@@ -48,8 +55,21 @@ class iRacingCollector:
             raise ValueError("iRacing credentials not found in environment variables")
         
         # Initialize database connections
-        self.postgres = PostgresConnector()
-        self.influx = InfluxConnector()
+        try:
+            self.postgres = PostgresConnector()
+            logger.debug("PostgreSQL connection initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize PostgreSQL connection: {e}")
+            logger.debug(f"PostgreSQL connection error details: {traceback.format_exc()}")
+            raise
+            
+        try:
+            self.influx = InfluxConnector()
+            logger.debug("InfluxDB connection initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize InfluxDB connection: {e}")
+            logger.debug(f"InfluxDB connection error details: {traceback.format_exc()}")
+            raise
         
         # Import pyracing here to handle any import issues gracefully
         try:
@@ -61,6 +81,7 @@ class iRacingCollector:
             raise
         except Exception as e:
             logger.error(f"Error initializing pyracing client: {e}")
+            logger.debug(f"pyracing client error details: {traceback.format_exc()}")
             raise
     
     async def authenticate(self):
@@ -71,6 +92,7 @@ class iRacingCollector:
             return True
         except Exception as e:
             logger.error(f"Authentication failed: {e}")
+            logger.debug(f"Authentication error details: {traceback.format_exc()}")
             return False
     
     async def collect_career_stats(self):
@@ -106,6 +128,7 @@ class iRacingCollector:
             return driver_data
         except Exception as e:
             logger.error(f"Error collecting career stats: {e}")
+            logger.debug(f"Career stats error details: {traceback.format_exc()}")
             raise
     
     async def collect_recent_races(self, count=10):
@@ -128,7 +151,12 @@ class iRacingCollector:
                     continue
                 
                 # Get detailed subsession data
-                subsession_data = await self.ir.get_subsession_data(race.subsession_id)
+                try:
+                    subsession_data = await self.ir.get_subsession_data(race.subsession_id)
+                except Exception as e:
+                    logger.error(f"Failed to get subsession data for {race.subsession_id}: {e}")
+                    logger.debug(f"Subsession data error details: {traceback.format_exc()}")
+                    continue
                 
                 # Store track information
                 track_data = {
@@ -189,6 +217,7 @@ class iRacingCollector:
             return race_count
         except Exception as e:
             logger.error(f"Error collecting recent races: {e}")
+            logger.debug(f"Recent races error details: {traceback.format_exc()}")
             raise
     
     async def collect_telemetry(self, session_id=None):
@@ -203,13 +232,25 @@ class iRacingCollector:
                 telemetry_dir = os.getenv("RACELABS_TELEMETRY_DIR", "./telemetry")
                 
                 # Find the newest telemetry file
-                telemetry_files = [f for f in os.listdir(telemetry_dir) if f.endswith(".ibt")]
-                if not telemetry_files:
-                    logger.warning("No telemetry files found")
+                try:
+                    telemetry_files = [f for f in os.listdir(telemetry_dir) if f.endswith(".ibt")]
+                    if not telemetry_files:
+                        logger.warning("No telemetry files found in directory: " + telemetry_dir)
+                        return False
+                    
+                    latest_file = max(telemetry_files, key=lambda f: os.path.getmtime(os.path.join(telemetry_dir, f)))
+                    telemetry_path = os.path.join(telemetry_dir, latest_file)
+                    logger.debug(f"Found telemetry file: {telemetry_path}")
+                except FileNotFoundError:
+                    logger.error(f"Telemetry directory not found: {telemetry_dir}")
                     return False
-                
-                latest_file = max(telemetry_files, key=lambda f: os.path.getmtime(os.path.join(telemetry_dir, f)))
-                telemetry_path = os.path.join(telemetry_dir, latest_file)
+                except PermissionError:
+                    logger.error(f"Permission denied accessing telemetry directory: {telemetry_dir}")
+                    return False
+                except Exception as e:
+                    logger.error(f"Error finding telemetry files: {e}")
+                    logger.debug(f"Telemetry file search error details: {traceback.format_exc()}")
+                    return False
             else:
                 # Logic to fetch telemetry for a specific session
                 # This would depend on your specific setup with RaceLabs
@@ -229,56 +270,80 @@ class iRacingCollector:
                 ir_sdk.startup(telemetry_path)
                 
                 if not ir_sdk.is_connected:
-                    logger.error("Failed to load telemetry file")
+                    logger.error(f"Failed to load telemetry file: {telemetry_path}")
                     return False
                 
                 # Extract session info
                 session_info = ir_sdk.session_info
+                logger.debug(f"Loaded telemetry session info: {session_info.get('WeekendInfo', {}).get('TrackName', 'Unknown')}")
                 
                 # Get telemetry data at intervals
                 telemetry_data = []
-                for i in range(0, ir_sdk.session_data_ticks, 10):  # Sample every 10 ticks
-                    ir_sdk.seek_to_tick(i)
+                sample_rate = int(os.getenv("TELEMETRY_SAMPLE_RATE", "10"))  # Sample every N ticks, configurable
+                
+                # Count total ticks for logging progress
+                total_ticks = ir_sdk.session_data_ticks
+                progress_interval = max(1, total_ticks // 10)  # Log progress at 10% intervals
+                
+                for i in range(0, total_ticks, sample_rate):
+                    if i % progress_interval == 0:
+                        logger.debug(f"Processing telemetry data: {i}/{total_ticks} ticks ({i/total_ticks*100:.1f}%)")
                     
-                    # Extract relevant telemetry metrics
-                    point = {
-                        "timestamp": datetime.fromtimestamp(ir_sdk.session_time),
-                        "lap": ir_sdk['Lap'],
-                        "speed": ir_sdk['Speed'],
-                        "rpm": ir_sdk['RPM'],
-                        "throttle": ir_sdk['Throttle'],
-                        "brake": ir_sdk['Brake'],
-                        "gear": ir_sdk['Gear'],
-                        "fuel_level": ir_sdk['FuelLevel'],
-                        "fuel_use_per_hour": ir_sdk['FuelUsePerHour'],
-                        "track_temp": ir_sdk['TrackTemp'],
-                        "air_temp": ir_sdk['AirTemp'],
-                        "lap_dist_pct": ir_sdk['LapDistPct']
-                    }
-                    
-                    # Add tire data if available
-                    if all(key in ir_sdk for key in ['LFtempCM', 'RFtempCM', 'LRtempCM', 'RRtempCM']):
-                        point.update({
-                            "lf_temp": ir_sdk['LFtempCM'],
-                            "rf_temp": ir_sdk['RFtempCM'],
-                            "lr_temp": ir_sdk['LRtempCM'],
-                            "rr_temp": ir_sdk['RRtempCM']
-                        })
-                    
-                    telemetry_data.append(point)
+                    try:
+                        ir_sdk.seek_to_tick(i)
+                        
+                        # Extract relevant telemetry metrics
+                        point = {
+                            "timestamp": datetime.fromtimestamp(ir_sdk.session_time),
+                            "lap": ir_sdk.get('Lap', 0),
+                            "speed": ir_sdk.get('Speed', 0),
+                            "rpm": ir_sdk.get('RPM', 0),
+                            "throttle": ir_sdk.get('Throttle', 0),
+                            "brake": ir_sdk.get('Brake', 0),
+                            "gear": ir_sdk.get('Gear', 0),
+                            "fuel_level": ir_sdk.get('FuelLevel', 0),
+                            "fuel_use_per_hour": ir_sdk.get('FuelUsePerHour', 0),
+                            "track_temp": ir_sdk.get('TrackTemp', 0),
+                            "air_temp": ir_sdk.get('AirTemp', 0),
+                            "lap_dist_pct": ir_sdk.get('LapDistPct', 0)
+                        }
+                        
+                        # Add tire data if available
+                        tire_keys = ['LFtempCM', 'RFtempCM', 'LRtempCM', 'RRtempCM']
+                        if any(key in ir_sdk for key in tire_keys):
+                            point.update({
+                                "lf_temp": ir_sdk.get('LFtempCM', 0),
+                                "rf_temp": ir_sdk.get('RFtempCM', 0),
+                                "lr_temp": ir_sdk.get('LRtempCM', 0),
+                                "rr_temp": ir_sdk.get('RRtempCM', 0)
+                            })
+                        
+                        telemetry_data.append(point)
+                    except Exception as e:
+                        logger.warning(f"Error processing telemetry tick {i}: {e}")
+                        if DEBUG_MODE:
+                            logger.debug(f"Tick processing error details: {traceback.format_exc()}")
+                        continue
                 
                 # Store in InfluxDB
-                self.influx.write_telemetry_points(telemetry_data)
+                try:
+                    self.influx.write_telemetry_points(telemetry_data)
+                    logger.info(f"Successfully stored {len(telemetry_data)} telemetry points")
+                except Exception as e:
+                    logger.error(f"Failed to write telemetry points to InfluxDB: {e}")
+                    logger.debug(f"InfluxDB write error details: {traceback.format_exc()}")
+                    return False
                 
-                logger.info(f"Successfully stored {len(telemetry_data)} telemetry points")
                 return len(telemetry_data)
             
             finally:
                 if 'ir_sdk' in locals() and hasattr(ir_sdk, 'is_connected') and ir_sdk.is_connected:
                     ir_sdk.shutdown()
+                    logger.debug("iRacing SDK connection closed")
         
         except Exception as e:
             logger.error(f"Error collecting telemetry: {e}")
+            logger.debug(f"Telemetry collection error details: {traceback.format_exc()}")
             raise
     
     def run_collection(self):
@@ -287,23 +352,83 @@ class iRacingCollector:
         
         async def main():
             # Authenticate
-            if not await self.authenticate():
-                return False
+            retry_count = int(os.getenv("API_RETRY_COUNT", "3"))
+            retry_delay = int(os.getenv("API_RETRY_DELAY", "5"))
             
-            # Collect career stats
-            await self.collect_career_stats()
+            for attempt in range(1, retry_count + 1):
+                try:
+                    if not await self.authenticate():
+                        if attempt < retry_count:
+                            logger.warning(f"Authentication failed, retrying in {retry_delay} seconds (attempt {attempt}/{retry_count})")
+                            await asyncio.sleep(retry_delay)
+                            continue
+                        logger.error(f"Authentication failed after {retry_count} attempts")
+                        return False
+                    break
+                except Exception as e:
+                    if attempt < retry_count:
+                        logger.warning(f"Authentication error: {e}, retrying in {retry_delay} seconds (attempt {attempt}/{retry_count})")
+                        await asyncio.sleep(retry_delay)
+                    else:
+                        logger.error(f"Authentication error after {retry_count} attempts: {e}")
+                        return False
             
-            # Collect recent races
-            await self.collect_recent_races(20)
+            # Collection success flags
+            career_stats_success = False
+            race_success = False
+            telemetry_success = False
             
-            # Collect telemetry
-            await self.collect_telemetry()
+            # Collect career stats with retry
+            for attempt in range(1, retry_count + 1):
+                try:
+                    await self.collect_career_stats()
+                    career_stats_success = True
+                    break
+                except Exception as e:
+                    if attempt < retry_count:
+                        logger.warning(f"Career stats collection error: {e}, retrying in {retry_delay} seconds (attempt {attempt}/{retry_count})")
+                        await asyncio.sleep(retry_delay)
+                    else:
+                        logger.error(f"Career stats collection failed after {retry_count} attempts: {e}")
             
-            return True
+            # Collect recent races with retry
+            for attempt in range(1, retry_count + 1):
+                try:
+                    race_count = int(os.getenv("RACE_COLLECTION_COUNT", "20"))
+                    await self.collect_recent_races(race_count)
+                    race_success = True
+                    break
+                except Exception as e:
+                    if attempt < retry_count:
+                        logger.warning(f"Race collection error: {e}, retrying in {retry_delay} seconds (attempt {attempt}/{retry_count})")
+                        await asyncio.sleep(retry_delay)
+                    else:
+                        logger.error(f"Race collection failed after {retry_count} attempts: {e}")
+            
+            # Collect telemetry with retry
+            for attempt in range(1, retry_count + 1):
+                try:
+                    await self.collect_telemetry()
+                    telemetry_success = True
+                    break
+                except Exception as e:
+                    if attempt < retry_count:
+                        logger.warning(f"Telemetry collection error: {e}, retrying in {retry_delay} seconds (attempt {attempt}/{retry_count})")
+                        await asyncio.sleep(retry_delay)
+                    else:
+                        logger.error(f"Telemetry collection failed after {retry_count} attempts: {e}")
+            
+            # Consider success if at least one component succeeded
+            return career_stats_success or race_success or telemetry_success
         
         # Run the async function
-        success = asyncio.run(main())
-        return success
+        try:
+            success = asyncio.run(main())
+            return success
+        except Exception as e:
+            logger.error(f"Unexpected error in collection process: {e}")
+            logger.debug(f"Collection process error details: {traceback.format_exc()}")
+            return False
 
 
 if __name__ == "__main__":
@@ -321,4 +446,5 @@ if __name__ == "__main__":
         sys.exit(1)
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
+        logger.debug(f"Startup error details: {traceback.format_exc()}")
         sys.exit(1)
