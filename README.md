@@ -396,10 +396,13 @@ To explore raw metrics, visit `http://localhost:8000/metrics` when the collector
 - Validate dashboards using the dashboard validator script
 
 ## Troubleshooting
+\n**IMPORTANT (March 2025)**: iRacing now requires CAPTCHA verification during login. See [AUTHENTICATION.md](AUTHENTICATION.md) for details on the manual token generation process.
 
 ### Common Issues
 
 1. **Data Collection Errors**:
+
+   - If you see "Authentication requires CAPTCHA verification" errors, follow the instructions in [AUTHENTICATION.md](AUTHENTICATION.md) to manually generate a token.
    - Check iRacing credentials in environment variables
    - Verify network connectivity to iRacing servers
    - Check the logs: `docker-compose logs collector`

@@ -1,4 +1,4 @@
-# File: python/collectors/iracing_collector_prometheus.py
+# File: python/collectors/iracing_collector_prometheus_fixed.py
 import os
 import sys
 import json
@@ -25,6 +25,7 @@ from dotenv import load_dotenv
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.db_connector import PostgresConnector
 from utils.prometheus_connector import PrometheusConnector
+from utils.iracing_auth import iRacingAuth
 
 # Configure logging
 logging.basicConfig(
@@ -46,153 +47,6 @@ if DEBUG_MODE:
 # Load environment variables from the local .env file
 dotenv_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
 load_dotenv(dotenv_path=dotenv_path)
-
-class iRacingDataAPI:
-    """New iRacing Data API client based on the official documentation"""
-    
-    BASE_URL = "https://members-ng.iracing.com"
-    
-    def __init__(self, username, password):
-        self.username = username
-        self.password = password
-        self.session = None
-        self.auth_token = None
-        self.access_token = None
-        
-    async def initialize(self):
-        """Initialize the session and authenticate"""
-        # Create a client session with cookie jar for maintaining authentication state
-        self.session = aiohttp.ClientSession(cookie_jar=aiohttp.CookieJar())
-        await self.authenticate()
-        return self
-        
-    async def authenticate(self):
-        """Authenticate with iRacing Data API using username and password"""
-        try:
-            login_url = f"{self.BASE_URL}/auth"
-            
-            # Base64 encode the password
-            password_hash = base64.b64encode(self.password.encode('utf-8')).decode('utf-8')
-            
-            data = {
-                "email": self.username,
-                "password": password_hash
-            }
-            
-            # Authenticate with iRacing - the cookies will be stored in the session cookie jar
-            async with self.session.post(login_url, json=data) as response:
-                if response.status == 200:
-                    logger.info("Successfully authenticated with iRacing Data API")
-                    # Cookies are automatically stored in the cookie jar
-                    logger.debug("Authentication successful, session cookies stored")
-                    return True
-                else:
-                    error_content = await response.text()
-                    logger.error(f"Authentication failed. Status code: {response.status}, Response: {error_content}")
-                    return False
-        except Exception as e:
-            logger.error(f"Error in authentication: {e}")
-            logger.debug(f"Authentication error details: {traceback.format_exc()}")
-            return False
-    
-    async def get_driver_info(self, customer_id):
-        """Get driver information using the Data API"""
-        try:
-            url = f"{self.BASE_URL}/data/member/get"
-            params = {"cust_id": customer_id}
-            
-            async with self.session.get(url, params=params) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    return data
-                else:
-                    error_content = await response.text()
-                    logger.error(f"Error getting driver info. Status code: {response.status}, Response: {error_content}")
-                    return None
-        except Exception as e:
-            logger.error(f"Error fetching driver info: {e}")
-            logger.debug(f"Driver info error details: {traceback.format_exc()}")
-            return None
-    
-    async def get_career_stats(self, customer_id):
-        """Get career statistics from the Data API"""
-        try:
-            url = f"{self.BASE_URL}/data/stats/member_career"
-            params = {"cust_id": customer_id}
-            
-            async with self.session.get(url, params=params) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    return data
-                else:
-                    error_content = await response.text()
-                    logger.error(f"Error getting career stats. Status code: {response.status}, Response: {error_content}")
-                    return None
-        except Exception as e:
-            logger.error(f"Error fetching career stats: {e}")
-            logger.debug(f"Career stats error details: {traceback.format_exc()}")
-            return None
-    
-    async def get_race_guide(self):
-        """Get race guide data"""
-        try:
-            url = f"{self.BASE_URL}/data/results/race_guide"
-            
-            async with self.session.get(url) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    return data
-                else:
-                    error_content = await response.text()
-                    logger.error(f"Error getting race guide. Status code: {response.status}, Response: {error_content}")
-                    return None
-        except Exception as e:
-            logger.error(f"Error fetching race guide: {e}")
-            logger.debug(f"Race guide error details: {traceback.format_exc()}")
-            return None
-    
-    async def get_session_data(self, subsession_id):
-        """Get detailed session data"""
-        try:
-            url = f"{self.BASE_URL}/data/results/get"
-            params = {"subsession_id": subsession_id}
-            
-            async with self.session.get(url, params=params) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    return data
-                else:
-                    error_content = await response.text()
-                    logger.error(f"Error getting session data. Status code: {response.status}, Response: {error_content}")
-                    return None
-        except Exception as e:
-            logger.error(f"Error fetching session data: {e}")
-            logger.debug(f"Session data error details: {traceback.format_exc()}")
-            return None
-    
-    async def get_license_info(self, customer_id):
-        """Get license information"""
-        try:
-            url = f"{self.BASE_URL}/data/member/license"
-            params = {"cust_id": customer_id}
-            
-            async with self.session.get(url, params=params) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    return data
-                else:
-                    error_content = await response.text()
-                    logger.error(f"Error getting license info. Status code: {response.status}, Response: {error_content}")
-                    return None
-        except Exception as e:
-            logger.error(f"Error fetching license info: {e}")
-            logger.debug(f"License info error details: {traceback.format_exc()}")
-            return None
-    
-    async def close(self):
-        """Close the session"""
-        if self.session:
-            await self.session.close()
 
 class iRacingCollector:
     """Collects data from iRacing API and stores it in PostgreSQL and Prometheus"""
@@ -224,13 +78,13 @@ class iRacingCollector:
             logger.debug(f"Prometheus initialization error details: {traceback.format_exc()}")
             raise
         
-        # Initialize iRacing Data API client
+        # Initialize iRacing Auth client
         self.ir = None
         
     async def connect_iracing_api(self):
         """Connect to the iRacing Data API"""
         try:
-            self.ir = await iRacingDataAPI(self.username, self.password).initialize()
+            self.ir = await iRacingAuth(self.username, self.password).initialize()
             logger.info("Successfully initialized iRacing Data API client")
             return True
         except Exception as e:
@@ -245,9 +99,14 @@ class iRacingCollector:
                 success = await self.connect_iracing_api()
                 return success
             
-            # Authentication is handled during initialization
-            logger.info("Successfully authenticated with iRacing API")
-            return True
+            # Ensure the auth client has a valid session
+            success = await self.ir.ensure_authenticated()
+            if success:
+                logger.info("Successfully authenticated with iRacing API")
+                return True
+            else:
+                logger.error("Failed to authenticate with iRacing API")
+                return False
         except Exception as e:
             logger.error(f"Authentication failed: {e}")
             logger.debug(f"Authentication error details: {traceback.format_exc()}")
@@ -274,7 +133,7 @@ class iRacingCollector:
                 raise ValueError("Invalid customer ID format")
             
             # Get driver information
-            driver_info = await self.ir.get_driver_info(customer_id)
+            driver_info = await self.ir.get_data(f"data/member/get", {"cust_id": customer_id})
             if not driver_info:
                 logger.error("Failed to retrieve driver information")
                 raise Exception("Failed to retrieve driver information")
@@ -282,19 +141,18 @@ class iRacingCollector:
             logger.debug(f"Retrieved driver info for customer ID: {customer_id}")
             
             # Get career stats
-            career_stats = await self.ir.get_career_stats(customer_id)
+            career_stats = await self.ir.get_data(f"data/stats/member_career", {"cust_id": customer_id})
             if not career_stats:
                 logger.error("Failed to retrieve career statistics")
                 raise Exception("Failed to retrieve career statistics")
             
             # Get license info
-            license_info = await self.ir.get_license_info(customer_id)
+            license_info = await self.ir.get_data(f"data/member/license", {"cust_id": customer_id})
             if not license_info:
                 logger.error("Failed to retrieve license information")
                 raise Exception("Failed to retrieve license information")
             
             # Process and store driver profile
-            # Note: The actual fields may need adjustment based on the API response structure
             driver_data = {
                 "iracing_id": customer_id,
                 "name": driver_info.get("name", f"Driver {customer_id}"),
@@ -336,13 +194,13 @@ class iRacingCollector:
                 raise ValueError("Invalid customer ID format")
             
             # Get driver info
-            driver_info = await self.ir.get_driver_info(customer_id)
+            driver_info = await self.ir.get_data(f"data/member/get", {"cust_id": customer_id})
             if not driver_info:
                 logger.error("Failed to retrieve driver information")
                 raise Exception("Failed to retrieve driver information")
             
             # Get recent sessions from race guide
-            recent_races = await self.ir.get_race_guide()
+            recent_races = await self.ir.get_data(f"data/results/race_guide")
             if not recent_races or not recent_races.get("sessions"):
                 logger.error("Failed to retrieve race guide data")
                 raise Exception("Failed to retrieve race guide data")
@@ -369,7 +227,7 @@ class iRacingCollector:
                     continue
                     
                 try:
-                    subsession_data = await self.ir.get_session_data(subsession_id)
+                    subsession_data = await self.ir.get_data(f"data/results/get", {"subsession_id": subsession_id})
                     if not subsession_data:
                         logger.error(f"Failed to get subsession data for {subsession_id}")
                         continue
