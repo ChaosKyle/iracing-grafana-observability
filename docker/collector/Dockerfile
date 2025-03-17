@@ -8,6 +8,8 @@ RUN apt-get update && \
     gcc \
     python3-dev \
     libpq-dev \
+    curl \
+    cron \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -15,17 +17,21 @@ RUN apt-get update && \
 COPY python/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy collector code
+# Copy collector code and token helpers
 COPY python/collectors/ ./collectors/
 COPY python/utils/ ./utils/
+COPY python/get_iracing_token.py .
+COPY python/auth_strategy.py .
+COPY python/iracing_token.json .
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app
 
-# Copy entry point script and set permissions
+# Copy entry point script and token refresh scripts
 COPY docker/collector/entrypoint.sh .
-RUN chmod +x entrypoint.sh
+COPY docker/collector/refresh_token.sh .
+RUN chmod +x entrypoint.sh refresh_token.sh
 
 # Create a non-root user and give proper permissions
 RUN useradd -m appuser && \

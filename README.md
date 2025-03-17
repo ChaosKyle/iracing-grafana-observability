@@ -2,7 +2,7 @@
 
 A comprehensive solution for collecting, storing, and visualizing iRacing telemetry and performance data using Grafana. Supports both local Docker deployment and Grafana Cloud for production use.
 
-![iRacing Telemetry Dashboard]<->putapicherewhenyougetitworking<->
+![iRacing Telemetry Dashboard](docs/images/dashboard-preview.png)
 
 ## Overview
 
@@ -13,6 +13,38 @@ This project provides a full-stack solution to collect, store, and visualize iRa
 - **Visualization**: Grafana dashboards for performance analysis and insights
 - **Containerization**: Docker images for all components
 - **Automation**: GitHub Actions workflows for CI/CD
+
+## Quick Start
+
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/ChaosKyle/iracing-grafana-observability.git
+   cd iracing-grafana-observability
+   ```
+
+2. **Configure environment**:
+   ```bash
+   # Create .env file with your credentials
+   cp .env.example .env
+   # Edit .env file with your iRacing credentials
+   ```
+
+3. **Generate authentication token** (required for CAPTCHA bypass):
+   ```bash
+   # Run the token generator
+   ./scripts/generate-token.sh
+   # Follow the prompts to log in and get cookie value
+   ```
+
+4. **Start the services**:
+   ```bash
+   docker-compose up -d
+   ```
+
+5. **Access dashboards**:
+   - Open http://localhost:3000 in your browser
+   - Login with default credentials (admin/admin)
+   - Browse the available dashboards
 
 ## Project Structure
 
@@ -73,6 +105,13 @@ This project offers two deployment options:
    # iRacing Credentials
    IRACING_USERNAME=your_iracing_username
    IRACING_PASSWORD=your_iracing_password
+   IRACING_CUSTOMER_ID=your_customer_id  # Optional: customer ID number
+   
+   # Authentication strategy - choose one:
+   # - token_file: Uses a token file (default, handles CAPTCHA issues)
+   # - api_direct: Direct API access (less reliable with CAPTCHA)
+   # - cookie: Cookie-based authentication only
+   AUTH_STRATEGY=token_file
    
    # Database Credentials
    POSTGRES_HOST=postgres
@@ -86,15 +125,35 @@ This project offers two deployment options:
    PROMETHEUS_PORT=9090
    ```
 
-3. **Start the stack**:
+3. **Generate authentication token** (required to bypass CAPTCHA):
+   ```bash
+   # Make sure the script is executable
+   chmod +x scripts/generate-token.sh
+   
+   # Run the token generator
+   ./scripts/generate-token.sh
+   ```
+   
+   This will:
+   - Try to authenticate with your credentials
+   - If CAPTCHA is required, open a browser for manual login
+   - Guide you to copy the authentication cookie
+   - Save the token for future use
+
+4. **Start the stack**:
    ```bash
    docker-compose up -d
    ```
 
-4. **Access Grafana**:
-   Open http://localhost:3000 in your browser (or the port configured in your `.env` file if different)
+5. **Access Grafana**:
+   - Open http://localhost:3000 in your browser
    - Default credentials: admin/admin
    - You'll be prompted to change the password on first login
+   
+6. **Monitor the collector**:
+   - View the collector dashboard at http://localhost:8080
+   - Check authentication status and token expiration
+   - Generate new tokens when needed (typically after ~7 days)
 
 ### Grafana Cloud Production Setup
 
@@ -395,16 +454,46 @@ To explore raw metrics, visit `http://localhost:8000/metrics` when the collector
 - Update documentation for new features
 - Validate dashboards using the dashboard validator script
 
+## Authentication with CAPTCHA
+
+**IMPORTANT (March 2025)**: iRacing has implemented CAPTCHA verification for API access. Our solution provides several methods to handle this:
+
+### Authentication Methods
+
+1. **Cookie-based Authentication** (Recommended)
+   - Manually log in once to get a cookie token
+   - Token lasts approximately 7 days before requiring renewal
+   - Most reliable method for bypassing CAPTCHA
+
+2. **Bearer Token Authentication**
+   - Attempts direct API authentication
+   - May still encounter CAPTCHA requirements
+   - Falls back to credential storage if needed
+
+3. **Credential Fallback**
+   - Stores credentials for manual authentication flow
+   - Used when other methods fail
+
+### Token Management
+
+The system includes automatic token management:
+- Daily token validation checks (configurable)
+- Token refresh attempts when expired
+- Web dashboard for monitoring token status
+- Guided process for manual token generation when needed
+
+For detailed instructions, see [ISSUE-iRacing-API-Auth-Error.md](ISSUE-iRacing-API-Auth-Error.md).
+
 ## Troubleshooting
-\n**IMPORTANT (March 2025)**: iRacing now requires CAPTCHA verification during login. See [AUTHENTICATION.md](AUTHENTICATION.md) for details on the manual token generation process.
 
 ### Common Issues
 
-1. **Data Collection Errors**:
-
-   - If you see "Authentication requires CAPTCHA verification" errors, follow the instructions in [AUTHENTICATION.md](AUTHENTICATION.md) to manually generate a token.
-   - Check iRacing credentials in environment variables
-   - Verify network connectivity to iRacing servers
+1. **Authentication Errors**:
+   - If you see "Authentication requires CAPTCHA verification" errors:
+     - Run `./scripts/generate-token.sh` to manually generate a token
+     - Follow the browser-based login process
+     - Copy the cookie value back to the script
+   - Check the authentication status at http://localhost:8080
    - Check the logs: `docker-compose logs collector`
 
 2. **Database Connection Issues**:
