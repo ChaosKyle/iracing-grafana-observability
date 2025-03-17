@@ -15,9 +15,65 @@ import getpass
 import webbrowser
 import requests
 import argparse
+import subprocess
+import platform
 from datetime import datetime
 
-def get_token(non_interactive=False, verbose=True, use_env=False):
+def open_browser_url(url, verbose=True):
+    """
+    Try multiple methods to open a URL, optimized for WSL environments
+    where standard browser opening may fail.
+    
+    Returns True if a method succeeded, False otherwise.
+    """
+    # Method 1: Try standard webbrowser module
+    try:
+        if verbose:
+            print("Attempting to open browser with standard method...")
+        webbrowser.open(url)
+        if verbose:
+            print("Browser should be opening now.")
+        return True
+    except Exception as e:
+        if verbose:
+            print(f"Standard browser open failed: {e}")
+    
+    # Method 2: For WSL, try using cmd.exe to open in Windows browser
+    if "microsoft" in platform.uname().release.lower() or "wsl" in platform.uname().release.lower():
+        try:
+            if verbose:
+                print("Detected WSL environment, trying Windows browser...")
+            cmd = ['cmd.exe', '/c', f'start {url}']
+            subprocess.run(cmd, check=True)
+            if verbose:
+                print("Windows browser should be opening now.")
+            return True
+        except Exception as e:
+            if verbose:
+                print(f"Windows browser open failed: {e}")
+    
+    # Method 3: If on Linux, try common browsers directly
+    browsers = ['google-chrome', 'chrome', 'firefox', 'brave-browser', 'chromium']
+    for browser in browsers:
+        try:
+            if verbose:
+                print(f"Trying to open with {browser}...")
+            subprocess.run([browser, url], check=True)
+            if verbose:
+                print(f"Browser {browser} should be opening now.")
+            return True
+        except:
+            pass
+    
+    # If we got here, all methods failed
+    if verbose:
+        print("\nUnable to automatically open a browser.")
+        print(f"Please manually navigate to: {url}")
+        print("After logging in, copy the irsso_membersv2 cookie value.")
+    
+    return False
+
+def get_token(non_interactive=False, verbose=True, use_env=False, manual_url=False):
     """Interactive process to get an iRacing auth token"""
     
     if verbose:
@@ -109,18 +165,28 @@ def get_token(non_interactive=False, verbose=True, use_env=False):
                 return False
             
             # Interactive mode with CAPTCHA
-            if verbose:
-                print("Opening iRacing website for manual login...")
-                
-                # Open web browser for manual login
-                webbrowser.open("https://members.iracing.com/membersite/login.jsp")
-                
-                print("\nPlease log in manually in the browser window that opened.")
-                print("Once logged in, copy your irsso_membersv2 cookie value.")
-                print("You can find this in your browser's developer tools under Application -> Storage -> Cookies.")
-                print("Look for the cookie named 'irsso_membersv2'.\n")
+            login_url = "https://members.iracing.com/membersite/login.jsp"
             
-            cookie_value = input("Enter irsso_membersv2 cookie value: ")
+            if verbose:
+                print("Manual login required for CAPTCHA verification.")
+                
+                if not manual_url:
+                    print("Attempting to open iRacing website for manual login...")
+                    browser_opened = open_browser_url(login_url, verbose)
+                else:
+                    browser_opened = False
+                
+                print("\nPlease log in to iRacing at:")
+                print(f"{login_url}")
+                print("\nOnce logged in, copy your irsso_membersv2 cookie value.")
+                print("You can find this in your browser's developer tools:")
+                print("1. Right-click anywhere on the page and select 'Inspect' or press F12")
+                print("2. Go to the 'Application' tab in Chrome (or 'Storage' in Firefox)")
+                print("3. Expand 'Cookies' in the left panel and select 'https://members.iracing.com'")
+                print("4. Find the cookie named 'irsso_membersv2' and copy its value")
+                print("\nNote: The cookie is usually a long string starting with 'IRMC_...'")
+            
+            cookie_value = input("\nEnter irsso_membersv2 cookie value: ")
             
             # Save the cookie value to a file
             token_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "iracing_token.json")
@@ -221,12 +287,14 @@ if __name__ == "__main__":
     parser.add_argument("--non-interactive", action="store_true", help="Run in non-interactive mode (requires environment variables)")
     parser.add_argument("--quiet", action="store_true", help="Suppress output messages")
     parser.add_argument("--use-env", action="store_true", help="Use credentials from environment variables")
+    parser.add_argument("--manual-url", action="store_true", help="Skip browser opening attempt, just show the URL to visit")
     args = parser.parse_args()
     
     success = get_token(
         non_interactive=args.non_interactive,
         verbose=not args.quiet,
-        use_env=args.use_env or args.non_interactive
+        use_env=args.use_env or args.non_interactive,
+        manual_url=args.manual_url
     )
     
     # In non-interactive mode, signal success/failure with exit code
